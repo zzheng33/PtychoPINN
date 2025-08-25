@@ -1,0 +1,9 @@
+*ipynb_checkpoints
+__pycache__
+*.swp
+*.swo
+*.swp
+.aider*
+mlruns_manuscript
+manuscript_figures
+data
