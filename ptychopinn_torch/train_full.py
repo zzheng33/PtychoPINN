@@ -50,6 +50,7 @@ def load_all_configs(ptycho_dir, config_path):
     Helper functions that loads all relevant configs specifically for this train_full process
     """
     print('Loading configs...')
+    d_config_replace, m_config_replace, t_config_replace, i_config_replace, dgen_config_replace = [None] * 5
     try:
         config_data = load_config_from_json(config_path)
         d_config_replace, m_config_replace, t_config_replace, i_config_replace, dgen_config_replace = validate_and_process_config(config_data)
@@ -178,3 +179,17 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"Training failed: {str(e)}")
         sys.exit(1)
+
+# Example 1: Synthetic training 
+
+# Step 1:
+# Go to example provided config (velociprobe_config.json)
+# Go to datagen_config.object_class and change this to any valid object, see config_params.py for config specs
+
+# Step 2: Run line below in root repository directory
+# ptychopinn_torch/train_full.py --ptycho_dir data/TP2 --config ptychopinn_torch/configs/velociprobe_config.json --mode synth
+
+# Step 3: Finished model will output a training_id associated with the model that can be used to load the model and perform inference.
+# Run inference.py (see inference.py for how-to) on any dataset.
+
+

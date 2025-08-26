@@ -7,7 +7,7 @@ import ptychopinn_torch.patch_generator
 import os
 from collections import defaultdict
 
-from ptychopinn_torch.reassembly import reconstruct_image, reassemble_multi_channel
+from ptychopinn_torch.reassembly import reconstruct_image, reassemble_multi_channel, reconstruct_image_barycentric
 from ptychopinn_torch.patch_generator import get_fixed_quadrant_neighbors_c4
 
 from ptychopinn_torch.eval.frc import frc_preprocess_images, _match_phases_least_squares
@@ -31,7 +31,7 @@ from mlflow import MlflowClient
 
 
 # Constant vars
-relative_mlruns_path = '../../mlruns'
+relative_mlruns_path = 'mlruns'
 tracking_uri = f"file:{os.path.abspath(relative_mlruns_path)}"
 
 def load_dataset(ptycho_dir, model_id, data_config_replace=None):
@@ -46,6 +46,7 @@ def load_dataset(ptycho_dir, model_id, data_config_replace=None):
 
 
     #Load configs
+    print(tracking_uri)
     data_config, model_config, training_config, inference_config, _ = load_all_configs_from_mlflow(model_id,
                                                                                             tracking_uri)
 
@@ -85,7 +86,7 @@ def load_model_and_reconstruct(model_id, ptycho_dataset,
 
     # Reconstruct image
     print('Reconstructing image...')
-    result, recon_dataset = reconstruct_image(loaded_model, ptycho_dataset,
+    result, recon_dataset, _ = reconstruct_image_barycentric(loaded_model, ptycho_dataset,
                            training_config, data_config, model_config, inference_config)
 
     return result, recon_dataset
@@ -346,7 +347,8 @@ def generate_gt_and_recon(file, model_name, model_dict,
     data_config_replace["y_bounds"] = [0.05, 0.95] 
 
     # Check to see if need to replace data config
-    if exp_name in ['pinn_velo_gold_tp_1', 'pinn_velo_ic_1']:
+    # This is a custom layer only for experiment recreation.
+    if exp_name in ['TP1', 'IC1']:
         data_config_replace["x_bounds"] = [0.07, 0.93]
         data_config_replace["y_bounds"] = [0.07, 0.93]
     
