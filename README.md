@@ -19,19 +19,33 @@ Note that having GPU access is highly recommended for both training and inferenc
 
 ## Installation
 Download `data.tar.gz` and `mlruns.tar.gz` from [zenodo link]()
-Install conda: https://conda.io/miniconda.html
-`conda install mamba -c conda-forge`
-`mamba env create -f environment.yml`
-`conda activate ptychopinn_torch`
-`tar -xzf data.tar.gz -xzf mlruns.tar.gz`
-`python initialize_data.py --no_dry_run`
 
+Install conda: https://conda.io/miniconda.html
+
+```
+conda install mamba -c conda-forge
+mamba env create -f environment.yml
+conda activate ptychopinn_torch
+tar -xzf data.tar.gz -xzf mlruns.tar.gz
+python initialize_data.py --no_dry_run
+```
 
 ## Usage
 ```
 Training
-$ train.py
-usage: []
+$ ptychopinn_torch/train_full.py
+usage: [--ptycho_dir ][--config] [--mode]
+
+Inference
+$ ptychopinn_torch/inference.py
+usage: [--run_id] [--infer_dir] [--file_index] [--config_override]
+```
+
+Examples:
+
+```
+Training
+
 ```
 
 For interactive usage, see `notebooks/ptycho_lines.ipynb` and `notebooks/non_grid_CDI_example.ipynb`. These demonstrate reconstruction with scanning CDI + grid scan pattern + simulated data and fresnel CDI + random scan pattern + experimental data, respectively.
