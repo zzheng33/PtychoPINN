@@ -56,28 +56,11 @@ $ ptychopinn_torch/inference.py --run_id 6fb4668f21e44e0b80056f64fdfedf01 --infe
 
 For interactive usage, see `notebooks/ptycho_lines.ipynb` and `notebooks/non_grid_CDI_example.ipynb`. These demonstrate reconstruction with scanning CDI + grid scan pattern + simulated data and fresnel CDI + random scan pattern + experimental data, respectively.
 
-### Checklist
+## Interactive Notebooks
+
+Use `recreate_results.ipynb` to use any of the models described in the paper to infer on the datasets provided. The models are provided as unique MLFlow run ids which can be referenced through a dictionary. 
+It also provides a small demo showcasing creation of the synthetic objects used to train the model.
 
 
-<!-- 
-* subpixel convolution (Depth-to-space)
-* make the model robust to arbitrary scaling/incorrect normalization of the diffracted intensity
-* other ideas: fft based loss, gradient loss, vq-vae https://www.tensorflow.org/tutorials/generative/style_transfer#define_content_and_style_representations
-* probe-based vs reconstruction-based support?
 
-* Fully Convolutional Networks for Semantic Segmentation, explore and discuss. Make a slide explaining the idea.
-* Try MC Dropout https://arxiv.org/pdf/1511.02680.pdf
-* read deep ensembles https://arxiv.org/pdf/1612.01474.pdf
-
-* hard constraint on diffraction norm using projection, consider tf.keras.constraints.MinMaxNorm
-* stochastic probe
-* probe symmetry consequences
-* add an object normalization layer that uses the L2 norm
-* how do super resolution models handle high resolutions?
-* shift invariance
-* grid permutation
-* fourier ring correlation
-
-* characterize robustness impact of Poisson likelihood vs. MAE
- -->
 
