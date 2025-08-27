@@ -55,8 +55,6 @@ def load_dataset(ptycho_dir, model_id, data_config_replace=None):
     if data_config_replace is not None:
         update_existing_config(data_config, data_config_replace)
 
-    print(data_config.x_bounds, data_config.y_bounds)
-
     print('Creating dataset...')
     ptycho_dataset = PtychoDataset(ptycho_dir, model_config, data_config,
                                 remake_map=True)

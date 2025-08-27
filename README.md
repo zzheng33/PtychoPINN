@@ -1,49 +1,43 @@
-# Physics constrained machine learning for rapid, high resolution diffractive imaging
+# Robust, multi-probe ptychographic neural networks via experimentally-grounded synthetic data
 
-This repository contains the codebase for the methods presented in the paper "[Physics Constrained Unsupervised Deep Learning for Rapid, High Resolution Scanning Coherent Diffraction Reconstruction](https://www.nature.com/articles/s41598-023-48351-7)". 
+This repository contains the codebase for the workflow and model in the paper "[Robust, multi-probe ptychographic neural networks via experimentally-grounded synthetic data]()". Note that this is a snapshot of the repository at the time of publication submission. The up-to-date repository can be found [here](https://github.com/hoidn/PtychoPINN).
 
 ## Overview
-PtychoPINN is an unsupervised physics-informed neural network reconstruction method for scanning CDI designed to improve upon the speed of conventional reconstruction methods without sacrificing image quality. Compared to prior NN approaches, the main source of improvements in image quality are its combination of the diffraction forward map with real-space overlap constraints.
+PtychoPINN-torch is an unsupervised physics-informed neural network reconstruction method for scanning transmission ptychography. This library is a PyTorch implementation based on PtychoPINN. There are small differences in architecture/inductive biases that are included in the manuscript.
+
+This library contains sufficient tools to re-create all results presented in the manuscript. This includes training and inference scripts whose instructions are posted below. Artifacts and data can be found at the following "[zenodo link]()". This package supports training with both experimental and synthetic data.
+
+Note that having GPU access is highly recommended for both training and inference due to the large image tensor sizes present.
+
 
 ## Features
-- **Unsupervised / self-supervised learning**: There is no need for extensive labeled training data, making the model more practical to train.
+- **Unsupervised / self-supervised learning**: There is no need for extensive labeled training data, making the model more practical to train on experiments
 - **Resolution**: PtychoPINN outperforms existing deep learning models for ptychographic reconstruction in terms of image quality, with a 10 dB PSNR increase and a 3- to 6-fold gain in linear resolution. Generalizability and robustness are also improved.
-- **Scalability and Speed**: PtychoPINN is two or three orders of magnitude as fast as iterative scanning CDI reconstruction.
-
-![Architecture diagram](diagram/lett.png)
-<!---
-*Fig. 1: Caption for the figure.*
- -->
+- **Scalability and Speed**: PtychoPINN is two or three orders of magnitude as fast as iterative ptychography algorithms
+- **Multi-experiment loading**: PtychoPINN-torch can load an arbitrary number of experiments due to memory-mapped dataloading via a custom dataloader. 
 
 
 ## Installation
-`python -m pip install .`
+Download `data.tar.gz` and `mlruns.tar.gz` from [zenodo link]()
+Install conda: https://conda.io/miniconda.html
+`conda install mamba -c conda-forge`
+`mamba env create -f environment.yml`
+`conda activate ptychopinn_torch`
+`tar -xzf data.tar.gz -xzf mlruns.tar.gz`
+`python initialize_data.py --no_dry_run`
+
 
 ## Usage
 ```
+Training
 $ train.py
-
-usage: PtychoPINN [-h] [--model_type MODEL_TYPE] [--label LABEL]
-                  [--positions_provided POSITIONS_PROVIDED] [--data_source DATA_SOURCE] [--set_phi]
-                  [--nepochs NEPOCHS] [--offset OFFSET] [--max_position_jitter MAX_POSITION_JITTER]
-                  [--output_prefix OUTPUT_PREFIX] [--gridsize GRIDSIZE]
-                  [--n_filters_scale N_FILTERS_SCALE] [--object_big OBJECT_BIG]
-                  [--intensity_scale_trainable INTENSITY_SCALE_TRAINABLE] [--nll_weight NLL_WEIGHT]
-                  [--mae_weight MAE_WEIGHT] [--nimgs_train NIMGS_TRAIN] [--nimgs_test NIMGS_TEST]
-                  [--outer_offset_train OUTER_OFFSET_TRAIN] [--outer_offset_test OUTER_OFFSET_TEST]
+usage: []
 ```
 
 For interactive usage, see `notebooks/ptycho_lines.ipynb` and `notebooks/non_grid_CDI_example.ipynb`. These demonstrate reconstruction with scanning CDI + grid scan pattern + simulated data and fresnel CDI + random scan pattern + experimental data, respectively.
 
 ### Checklist
-| Status | Task |
-|--------|------|
-| 🟢 | Reconstruction with non-grid scan patterns |
-| 🟢 | Workflow for experimental data |
-| 🟡 | Position correction in CDI mode |
-| 🟡 | Probe fitting |
-| 🔴 | Stochastic probe model |
-| 🔴 | 128 x 128 resolution |
+
 
 <!-- 
 * subpixel convolution (Depth-to-space)

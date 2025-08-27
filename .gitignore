@@ -4,7 +4,10 @@ __pycache__
 *.swo
 *.swp
 .aider*
+.vscode*
+figures
 manuscript_figures
 mlruns
 mlruns_raw
 data
+

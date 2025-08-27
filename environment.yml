@@ -1,4 +1,4 @@
-name: ptychopinn_pytorch_test # Or a new name for a fresh start
+name: ptychopinn_torch
 channels:
   - pytorch        # Highest priority for PyTorch packages
   - nvidia         # For CUDA toolkit, cudnn
@@ -7,35 +7,26 @@ channels:
 dependencies:
   # --- Core Python & PyTorch ---
   - python=3.10     # Or 3.9, 3.11, as per your needs
-
+  
   # PyTorch with CUDA 11.8 support.
-  # This metapackage will pull in
-  #   - the correct pytorch build
-  #   - torchvision
-  #   - torchaudio
-  #   - cuda-toolkit from the nvidia channel
-  #   - cudnn from the nvidia channel
   - pytorch::pytorch
   - pytorch::torchvision
   - pytorch::torchaudio
-  - pytorch-cuda=11.8  #  <--- THIS IS KEY for GPU build from pytorch & nvidia channels
+  - pytorch-cuda=11.8 
 
   # --- Your Other Essential Packages ---
-  # Add only what you absolutely need for this specific environment
   - scikit-learn
   - pytorch-lightning
-  - jupyterlab        # I prefer jupyterlab over classic jupyter
+  - jupyterlab       
   - matplotlib
-  - pandas            # Often useful
+  - pandas            
   - h5py
   - scikit-image
-  - mlflow            # Moved from the end to be with other conda packages
+  - mlflow           
   - opencv
 
   # --- Pip dependencies (if absolutely necessary) ---
-  # Only list packages here that are NOT available on Conda channels
   - pip
   - pip:
-    - -r requirements.txt
-  # If you still have a requirements.txt for pip-only packages:
-
+    - -r requirements.txt  
+    - -e .                 
