@@ -15,6 +15,7 @@ Note that having GPU access is highly recommended for both training and inferenc
 - **Resolution**: PtychoPINN outperforms existing deep learning models for ptychographic reconstruction in terms of image quality, with a 10 dB PSNR increase and a 3- to 6-fold gain in linear resolution. Generalizability and robustness are also improved.
 - **Scalability and Speed**: PtychoPINN is two or three orders of magnitude as fast as iterative ptychography algorithms
 - **Multi-experiment loading**: PtychoPINN-torch can load an arbitrary number of experiments due to memory-mapped dataloading via a custom dataloader. 
+- **Re-usability**: Reusable/repeatable training experiments thanks to MLFlow and saving all data/model related artifacts.
 
 
 ## Installation
@@ -42,6 +43,8 @@ usage: [--run_id] [--infer_dir] [--file_index] [--config_override]
 ```
 
 Examples:
+
+Note that all demo configuration files included have a default number of devices at 1. Increase this if you want faster training with multiple gpus.
 
 ```
 Training

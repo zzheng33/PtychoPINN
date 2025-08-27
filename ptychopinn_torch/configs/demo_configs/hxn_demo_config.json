@@ -33,7 +33,7 @@
   "training_config": {
     "num_workers": 4,
     "learning_rate": 0.001,
-    "n_devices": 2, 
+    "n_devices": 1, 
     "batch_size": 16,
     "accum_steps": 1,
     "epochs_fine_tune": 5,
