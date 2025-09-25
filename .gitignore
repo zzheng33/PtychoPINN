@@ -10,6 +10,7 @@ manuscript_figures
 mlruns
 mlruns_raw
 data
-ptychopinn_torch/configs/*.json
-ptychopinn_torch/configs/publication_configs/
+ptychopinn_torch/configs/*
+!ptychopinn_torch/configs/demo_configs/
+
 
