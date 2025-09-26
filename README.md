@@ -19,7 +19,7 @@ Note that having GPU access is highly recommended for both training and inferenc
 
 
 ## Installation
-Download `data.tar.gz` and `mlruns.tar.gz` from [zenodo link]()
+Download `data.tar.gz` and `mlruns.tar.gz` from [zenodo link](https://doi.org/10.5281/zenodo.16968020)
 
 Install conda: https://conda.io/miniconda.html
 
