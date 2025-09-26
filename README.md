@@ -1,11 +1,11 @@
-# Robust, multi-probe ptychographic neural networks via experimentally-grounded synthetic data
+# Towards generalizable deep ptychography neural networks
 
-This repository contains the codebase for the workflow and model in the paper "[Robust, multi-probe ptychographic neural networks via experimentally-grounded synthetic data]()". Note that this is a snapshot of the repository at the time of publication submission. The up-to-date repository can be found [here](https://github.com/hoidn/PtychoPINN).
+This repository contains the codebase for the workflow and model in the paper "[Towards generalizable deep ptychography neural networks]()". Note that this is a snapshot of the repository at the time of publication submission. The up-to-date repository can be found [here](https://github.com/hoidn/PtychoPINN).
 
 ## Overview
 PtychoPINN-torch is an unsupervised physics-informed neural network reconstruction method for scanning transmission ptychography. This library is a PyTorch implementation based on PtychoPINN. There are small differences in architecture/inductive biases that are included in the manuscript.
 
-This library contains sufficient tools to re-create all results presented in the manuscript. This includes training and inference scripts whose instructions are posted below. Artifacts and data can be found at the following "[zenodo link]()". This package supports training with both experimental and synthetic data.
+This library contains sufficient tools to re-create all results presented in the manuscript. This includes training and inference scripts whose instructions are posted below. Artifacts and data can be found at the following "[zenodo link](https://doi.org/10.5281/zenodo.16968020)". This package supports training with both experimental and synthetic data.
 
 Note that having GPU access is highly recommended for both training and inference due to the large image tensor sizes present.
 
