@@ -294,8 +294,8 @@ def get_fixed_quadrant_neighbors_c4(
             y_lower_bound, y_upper_bound = 0, 10
             y_bound = y_lower_bound
         elif data_config.scan_pattern == 'Rectangular':
-            x_lower_bound, x_upper_bound = 0, 12
-            y_lower_bound, y_upper_bound = 0.7, 2
+            x_lower_bound, x_upper_bound = 0, max_dist
+            y_lower_bound, y_upper_bound = 0, max_dist
             y_bound = y_upper_bound
 
         # bound = 0.7
@@ -309,9 +309,9 @@ def get_fixed_quadrant_neighbors_c4(
                 quadrant_candidates["TL"].append(neighbor_idx)
             elif d_x > x_lower_bound and d_x < x_upper_bound and d_y > -y_lower_bound and d_y < y_upper_bound:
                 quadrant_candidates["TR"].append(neighbor_idx)
-            elif d_x < x_lower_bound and d_x > -x_upper_bound and d_y < -y_bound:
+            elif d_x < x_lower_bound and d_x > -x_upper_bound and d_y < -y_lower_bound:
                 quadrant_candidates["BL"].append(neighbor_idx)
-            elif d_x > x_lower_bound and d_x < x_upper_bound and d_y < -y_bound:
+            elif d_x > x_lower_bound and d_x < x_upper_bound and d_y < -y_lower_bound:
                 quadrant_candidates["BR"].append(neighbor_idx)
             # Ignore points exactly on axes relative to the center
 
