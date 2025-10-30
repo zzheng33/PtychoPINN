@@ -42,8 +42,8 @@ from ptychopinn_torch.datagen.datagen import simulate_multiple_experiments, gene
 from ptychopinn_torch.datagen.datagen import assemble_precomputed_images, simulate_synthetic_objects, simulate_synthetic_probes
 from ptychopinn_torch.train import main
 
-# mlflow.set_tracking_uri("http://127.0.0.1:5000")
-# mlflow.set_experiment("PtychoPINN")
+mlflow.set_tracking_uri("http://127.0.0.1:5001")
+mlflow.set_experiment("PtychoPINN")
 
 def load_all_configs(ptycho_dir, config_path):
     """

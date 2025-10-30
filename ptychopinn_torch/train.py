@@ -160,6 +160,7 @@ def main(ptycho_dir,
         check_val_every_n_epoch=1,  # Validate every epoch
         enable_checkpointing=True,  # Enable checkpointing for early stopping
         enable_progress_bar=True,
+        log_every_n_steps=20
     )
 
     #Mlflow setup

@@ -74,7 +74,7 @@ def load_and_predict(run_id,
     '''
     
     #MLFlow tracking for model
-    tracking_uri = f"file:{os.path.abspath(relative_mlflow_path)}"
+    tracking_uri = "http://127.0.0.1:5001"
     mlflow.set_tracking_uri(tracking_uri)
     model_uri = f"runs:/{run_id}/model"
     #Loading config
