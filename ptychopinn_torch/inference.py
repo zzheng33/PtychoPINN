@@ -82,7 +82,7 @@ def load_and_predict(run_id,
         data_config, model_config, training_config, inference_config, datagen_config = load_all_configs_from_mlflow(run_id,
                                                                                          tracking_uri)
     else:
-        data_config, model_config, training_config, inference_config, datagen_config = load_all_configs(config_override_path)
+        data_config, model_config, training_config, inference_config, datagen_config = load_all_configs(config_override_path, file_index)
 
     # Manually overriding experiment number indexing
     i_config_replace = {}
