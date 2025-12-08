@@ -48,10 +48,10 @@ Note that all demo configuration files included have a default number of devices
 
 ```
 Training
-$ ptychopinn_torch/train_full.py --ptycho_dir data/TP2 --config ptychopinn_torch/configs/velociprobe_config.json --mode synth
+$ ptychopinn_torch/train_full.py --ptycho_dir data/TP2 --config ptychopinn_torch/configs/demo_configs/velociprobe_config.json --mode synth
 
 Inference
-$ ptychopinn_torch/inference.py --run_id 6fb4668f21e44e0b80056f64fdfedf01 --infer_dir data/TP2 --config ptychopinn_torch/configs/hxn_demo_config.json
+$ ptychopinn_torch/inference.py --run_id 6fb4668f21e44e0b80056f64fdfedf01 --infer_dir data/TP2 --config ptychopinn_torch/configs/demo_configs/velociprobe_config.json
 ```
 
 For interactive usage, see `notebooks/ptycho_lines.ipynb` and `notebooks/non_grid_CDI_example.ipynb`. These demonstrate reconstruction with scanning CDI + grid scan pattern + simulated data and fresnel CDI + random scan pattern + experimental data, respectively.

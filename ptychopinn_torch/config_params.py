@@ -33,6 +33,10 @@ class DataConfig:
     x_bounds: Tuple[float, float] = (0.1,0.9)
     y_bounds: Tuple[float, float] = (0.1,0.9)
 
+    #Bounding parameters for nearest neighbor finding
+    x_neighbor_bounds: Tuple[float, float] = (0.0,12.0)
+    y_neighbor_bounds: Tuple[float, float] = (0.7,2.0)
+
 @dataclass
 class ModelConfig:
     """Configuration parameters related to the model architecture and behavior."""

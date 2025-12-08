@@ -64,7 +64,8 @@ def load_and_predict(run_id,
                      file_index = 0,
                      save_dir = "inference/output",
                      plot_name = "Test",
-                     verbose = False):
+                     verbose = False,
+                     remote_server = False):
     '''
     Given MLFlow run id, as well as ptycho file directory, will provide predictions 
     Args:
@@ -74,7 +75,10 @@ def load_and_predict(run_id,
     '''
     
     #MLFlow tracking for model
-    tracking_uri = "http://127.0.0.1:5001"
+    if not remote_server:
+        tracking_uri = f"file:{os.path.abspath(relative_mlflow_path)}"
+    else:
+        tracking_uri = "http://127.0.0.1:5001"
     mlflow.set_tracking_uri(tracking_uri)
     model_uri = f"runs:/{run_id}/model"
     #Loading config
@@ -90,11 +94,13 @@ def load_and_predict(run_id,
     update_existing_config(inference_config, i_config_replace)
 
     #Loading model
+    print("Loading model...")
     model_load_start = time.time()
     loaded_model = mlflow.pytorch.load_model(model_uri)
     loaded_model.to(training_config.device)
     loaded_model.training = True
     model_load_time = time.time() - model_load_start
+    print("Model loaded. Beginning dataloader prep...")
 
     #Load data into dataset structure
     data_load_start = time.time()
@@ -102,6 +108,8 @@ def load_and_predict(run_id,
                                 remake_map=True)
     
     data_load_time = time.time() - data_load_start
+
+    print("Dataloader finished.")
     
     #Reconstructing. Automatically puts dataset into dataloader, so don't worry about it
     if verbose:

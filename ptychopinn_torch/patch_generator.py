@@ -245,7 +245,8 @@ def get_fixed_quadrant_neighbors_c4(
     points = np.column_stack((xcoords, ycoords))
     points_bounded = np.column_stack((xcoords_bounded, ycoords_bounded))
     n_points_bounded = points_bounded.shape[0]
-
+    
+    #General neighbor distances
     min_dist = getattr(data_config, 'min_neighbor_distance', 0.0)
     max_dist = getattr(data_config, 'max_neighbor_distance', np.inf)
 
@@ -294,8 +295,8 @@ def get_fixed_quadrant_neighbors_c4(
             y_lower_bound, y_upper_bound = 0, 10
             y_bound = y_lower_bound
         elif data_config.scan_pattern == 'Rectangular':
-            x_lower_bound, x_upper_bound = 0, max_dist
-            y_lower_bound, y_upper_bound = 0, max_dist
+            x_lower_bound, x_upper_bound = getattr(data_config, 'x_neighbor_bounds', (0.0, 12.0))
+            y_lower_bound, y_upper_bound = getattr(data_config, 'y_neighbor_bounds', (0.7, 2))
             y_bound = y_upper_bound
 
         # bound = 0.7
@@ -309,9 +310,9 @@ def get_fixed_quadrant_neighbors_c4(
                 quadrant_candidates["TL"].append(neighbor_idx)
             elif d_x > x_lower_bound and d_x < x_upper_bound and d_y > -y_lower_bound and d_y < y_upper_bound:
                 quadrant_candidates["TR"].append(neighbor_idx)
-            elif d_x < x_lower_bound and d_x > -x_upper_bound and d_y < -y_lower_bound:
+            elif d_x < x_lower_bound and d_x > -x_upper_bound and d_y < -y_bound:
                 quadrant_candidates["BL"].append(neighbor_idx)
-            elif d_x > x_lower_bound and d_x < x_upper_bound and d_y < -y_lower_bound:
+            elif d_x > x_lower_bound and d_x < x_upper_bound and d_y < -y_bound:
                 quadrant_candidates["BR"].append(neighbor_idx)
             # Ignore points exactly on axes relative to the center
 
