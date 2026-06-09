@@ -177,7 +177,7 @@ class PtychoDataset(Dataset):
                     data_prefix_path.mkdir(parents=True, exist_ok=True)
                     self.data_dir_path.mkdir(parents=True, exist_ok=True)
                     self.memory_map_data(self.file_list)
-                    np.savez(self.state_path, data_dict=self.data_dict)
+                    np.savez(self.state_path, data_dict=self.data_dict, length=self.length)
                 except Exception as e:
                     print(f"[Rank 0] FATAL ERROR during map creation/saving: {e}")
                     raise # This will halt rank 0; other ranks will time out at barrier.
@@ -197,6 +197,9 @@ class PtychoDataset(Dataset):
             self.mmap_ptycho = TensorDict.load_memmap(str(self.data_dir_path)) # Load memory map that was initialized by Rank 0
             loaded_state = np.load(self.state_path, allow_pickle=True)
             self.data_dict = loaded_state['data_dict'].item()
+            if 'length' in loaded_state:
+                self.length = int(loaded_state['length'])
+                self.mmap_ptycho = self.mmap_ptycho[:self.length]
 
         except Exception as e:
             print(f"[Rank {self.current_rank}] FATAL ERROR loading map files or state AFTER barrier: {e}")
@@ -429,9 +432,11 @@ class PtychoDataset(Dataset):
             print("Populating memory map for dataset {}".format(i))
             #Calculating all non-diffraction related parameters/tensors
             #Assume: N = # of scans
-            start, end = self.cum_length[i], self.cum_length[i+1]
+            estimated_start, estimated_end = self.cum_length[i], self.cum_length[i+1]
+            start = global_from
+            estimated_count = estimated_end - estimated_start
 
-            print(f"Start - end = {end- start}")
+            print(f"Estimated rows for dataset: {estimated_count}")
             #Writing to non-diffraction memory maps in one go:
             non_diff_timer_start = time.time()
 
@@ -457,6 +462,9 @@ class PtychoDataset(Dataset):
                 
                 #Get relative and center of mass coordinates for each coordinate group
                 coords_com, coords_relative = get_relative_coords(coords_nn)
+                actual_count = len(nn_indices)
+                end = start + actual_count
+                print(f"Actual grouped rows for dataset: {actual_count}")
                 mmap_ptycho["coords_center"][start:end] = torch.from_numpy(coords_com)
                 mmap_ptycho["coords_relative"][start:end] = torch.from_numpy(coords_relative)
                 mmap_ptycho["nn_indices"][start:end] = torch.from_numpy(nn_indices)
@@ -472,7 +480,10 @@ class PtychoDataset(Dataset):
 
                 #Otherwise, the indices are just an arange from 0 to N-1
                 nn_indices = self.valid_indices_per_file[i]
-                index_range = np.arange(end-start, dtype=np.int64)
+                actual_count = len(nn_indices)
+                end = start + actual_count
+                print(f"Actual rows for dataset: {actual_count}")
+                index_range = np.arange(actual_count, dtype=np.int64)
                 mmap_ptycho["nn_indices"][start:end] = torch.from_numpy(index_range)[:,None]
                 mmap_ptycho["coords_global"][start:end] = torch.from_numpy(
                                                             np.stack([xcoords,
@@ -582,6 +593,10 @@ class PtychoDataset(Dataset):
             print("Diffraction memory map write time: {}".format(diff_time))
         
         #Assign memory map to class attribute
+        if global_from < mmap_length:
+            print(f"Trimming memory map from estimated length {mmap_length} to actual length {global_from}.")
+            mmap_ptycho = mmap_ptycho[:global_from]
+            self.length = global_from
         self.mmap_ptycho = mmap_ptycho
 
         return 

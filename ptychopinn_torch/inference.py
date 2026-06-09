@@ -9,6 +9,7 @@ import sys
 import mlflow
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 
 #Custom
@@ -65,7 +66,8 @@ def load_and_predict(run_id,
                      save_dir = "inference/output",
                      plot_name = "Test",
                      verbose = False,
-                     remote_server = False):
+                     remote_server = False,
+                     device = None):
     '''
     Given MLFlow run id, as well as ptycho file directory, will provide predictions 
     Args:
@@ -93,10 +95,17 @@ def load_and_predict(run_id,
     i_config_replace['experiment_number'] = file_index
     update_existing_config(inference_config, i_config_replace)
 
+    if device is None:
+        device = training_config.device
+    if str(device).startswith("cuda") and not torch.cuda.is_available():
+        print("CUDA requested by config but unavailable; using CPU.")
+        device = "cpu"
+    training_config.device = device
+
     #Loading model
     print("Loading model...")
     model_load_start = time.time()
-    loaded_model = mlflow.pytorch.load_model(model_uri)
+    loaded_model = mlflow.pytorch.load_model(model_uri, map_location=torch.device(device))
     loaded_model.to(training_config.device)
     loaded_model.training = True
     model_load_time = time.time() - model_load_start
@@ -211,7 +220,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"Inference failed because of: {str(e)}")
         sys.exit(1)
-
 
 
 

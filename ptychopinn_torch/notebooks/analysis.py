@@ -28,6 +28,7 @@ from matplotlib import patheffects
 import numpy as np
 import mlflow.pytorch
 from mlflow import MlflowClient
+import torch
 
 
 # Constant vars
@@ -63,7 +64,8 @@ def load_dataset(ptycho_dir, model_id, data_config_replace=None):
 
 def load_model_and_reconstruct(model_id, ptycho_dataset,
                               data_config, model_config, training_config,
-                              inference_config, inference_config_replace = None):
+                              inference_config, inference_config_replace = None,
+                              device = None):
     """
     Loads the model and reconstructs the image from the dataset.
     Args:
@@ -78,8 +80,14 @@ def load_model_and_reconstruct(model_id, ptycho_dataset,
     # Loading model
     mlflow.set_tracking_uri(tracking_uri)
     model_uri = f"runs:/{model_id}/model"
-    loaded_model = mlflow.pytorch.load_model(model_uri)
-    loaded_model.to('cuda')
+    if device is None:
+        device = training_config.device
+    if str(device).startswith('cuda') and not torch.cuda.is_available():
+        print("CUDA requested by config but unavailable; using CPU.")
+        device = 'cpu'
+    training_config.device = device
+    loaded_model = mlflow.pytorch.load_model(model_uri, map_location=torch.device(device))
+    loaded_model.to(device)
     loaded_model.training = True
 
     # Reconstruct image
@@ -525,6 +533,7 @@ def plot_object(data, colorbar_size=(0.06, 0.3),
     cb_phase.outline.set_edgecolor('white')
     
     if save_path:
+        os.makedirs(save_path, exist_ok=True)
         full_save_path = os.path.join(save_path, f"{save_name}.{format}")
         plt.savefig(full_save_path, format=format, dpi=dpi, 
                    bbox_inches='tight', pad_inches=0, 

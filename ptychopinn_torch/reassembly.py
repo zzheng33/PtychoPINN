@@ -505,6 +505,9 @@ def reconstruct_image_barycentric(model: nn.Module,
         model, gpu_ids, primary_device = setup_multi_gpu_model(model, gpu_ids)
         if verbose:
             print(f"Using {len(gpu_ids)} GPUs: {gpu_ids}")
+
+    primary_device = torch.device(primary_device)
+    use_cuda = primary_device.type == 'cuda'
     
     # Get dataset subset
     n_files = ptycho_dset.n_files
@@ -570,7 +573,7 @@ def reconstruct_image_barycentric(model: nn.Module,
             
             # Model inference with optional mixed precision
             inference_start = time.time()
-            if use_mixed_precision:
+            if use_mixed_precision and use_cuda:
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
                     if isinstance(model, nn.DataParallel):
                         inputs = (x, positions, probe, in_scale)
@@ -584,7 +587,8 @@ def reconstruct_image_barycentric(model: nn.Module,
                 else:
                     batch_output = model.forward_predict(x, positions, probe, in_scale)
             
-            torch.cuda.synchronize()
+            if use_cuda:
+                torch.cuda.synchronize()
             inference_time = time.time() - inference_start
             total_inference_time += inference_time
             
@@ -630,7 +634,8 @@ def reconstruct_image_barycentric(model: nn.Module,
             del batch_output, im_center, canvas_positions
             
             if i % 5 == 0:
-                torch.cuda.empty_cache()
+                if use_cuda:
+                    torch.cuda.empty_cache()
                 gc.collect()
             
             if verbose:
@@ -653,10 +658,10 @@ def reconstruct_image_barycentric(model: nn.Module,
         print(f"  Total reconstruction time: {total_inference_time + total_assembly_time:.2f}s")
     
     # Final cleanup
-    torch.cuda.empty_cache()
+    if use_cuda:
+        torch.cuda.empty_cache()
     gc.collect()
     
     return canvas / canvas_counts, ptycho_subset, [total_inference_time, total_assembly_time]
 
              
-
