@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -87,11 +88,7 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
         monitor_cmd.extend(["--devices", args.devices])
 
     inference_cmd = [
-        "conda",
-        "run",
-        "-n",
-        args.conda_env,
-        "python",
+        sys.executable,
         str(INFERENCE_SCRIPT),
         "--dataset",
         dataset,
@@ -115,9 +112,11 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
 
     start = time.time()
     completed = None
+    env = os.environ.copy()
+    env["MLFLOW_ALLOW_FILE_STORE"] = "true"
     try:
         print(f"Running inference: dataset={dataset}, batch_size={batch_size}", flush=True)
-        completed = subprocess.run(inference_cmd, cwd=REPO_ROOT)
+        completed = subprocess.run(inference_cmd, cwd=REPO_ROOT, env=env)
     finally:
         monitor.terminate()
         try:
@@ -155,7 +154,7 @@ def main() -> int:
     parser.add_argument("--devices", default=None, help="Comma-separated GPU indices to monitor.")
     parser.add_argument("--interval", type=float, default=0.2)
     parser.add_argument("--warmup-seconds", type=float, default=0.5)
-    parser.add_argument("--conda-env", default="ptychopinn_torch")
+    parser.add_argument("--conda-env", default="ptychopinn_torch", help="Kept for wrapper compatibility.")
     parser.add_argument("--model-key", default=None)
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--config", default=None)
