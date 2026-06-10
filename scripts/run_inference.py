@@ -97,6 +97,7 @@ def main() -> None:
     parser.add_argument("--run-id", default=None, help="Raw MLflow run id. Overrides --model-key.")
     parser.add_argument("--config", default=None, help="Optional config override JSON.")
     parser.add_argument("--file-index", type=int, default=0)
+    parser.add_argument("--batch-size", type=int, default=None, help="Inference batch size override.")
     parser.add_argument("--output-dir", type=Path, default=Path("inference_outputs"))
     parser.add_argument(
         "--device",
@@ -140,6 +141,7 @@ def main() -> None:
         plot_name=plot_name,
         verbose=True,
         device=device,
+        batch_size=args.batch_size,
     )
 
     result_cpu = result.detach().cpu().numpy()

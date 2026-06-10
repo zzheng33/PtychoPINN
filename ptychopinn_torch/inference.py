@@ -67,7 +67,8 @@ def load_and_predict(run_id,
                      plot_name = "Test",
                      verbose = False,
                      remote_server = False,
-                     device = None):
+                     device = None,
+                     batch_size = None):
     '''
     Given MLFlow run id, as well as ptycho file directory, will provide predictions 
     Args:
@@ -93,6 +94,8 @@ def load_and_predict(run_id,
     # Manually overriding experiment number indexing
     i_config_replace = {}
     i_config_replace['experiment_number'] = file_index
+    if batch_size is not None:
+        i_config_replace['batch_size'] = batch_size
     update_existing_config(inference_config, i_config_replace)
 
     if device is None:
@@ -220,7 +223,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"Inference failed because of: {str(e)}")
         sys.exit(1)
-
 
 
 
