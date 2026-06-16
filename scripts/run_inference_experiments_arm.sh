@@ -5,10 +5,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Edit these defaults for your ARM/Grace experiment sweep.
-# DATASETS=(TP1 TP2 IC1 IC2 NCM FLY1 LFP W LCLS)
-DATASETS=(IC2)
+DATASETS=(TP1 TP2 IC1 IC2 NCM FLY1 LFP W LCLS)
+# DATASETS=(IC2)
 BATCH_SIZES=(32 64 128 256 512 1024)
-BATCH_SIZES=(1024)
+# BATCH_SIZES=(1024)
 DEVICE="cuda"
 VENDOR="auto"
 DEVICES="${DEVICES:-0}"
