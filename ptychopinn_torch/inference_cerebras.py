@@ -93,7 +93,7 @@ def load_cerebras_inference_model(
         update_existing_config(inference_config, {"batch_size": batch_size})
 
     device = torch.device(device)
-    model_uri = f"runs:/{run_id}/model"
+    model_uri = _resolve_local_model_uri(run_id, relative_mlflow_path)
     loaded_model = mlflow.pytorch.load_model(model_uri, map_location=device)
     loaded_model.to(device)
     loaded_model.eval()
@@ -104,6 +104,20 @@ def load_cerebras_inference_model(
 
     configs = (data_config, model_config, training_config, inference_config, datagen_config)
     return wrapper, configs
+
+
+def _resolve_local_model_uri(run_id: str, relative_mlflow_path: str) -> str:
+    """Resolve MLflow model artifact locally when copied meta.yaml paths are stale."""
+
+    mlruns_path = Path(relative_mlflow_path)
+    if not mlruns_path.is_absolute():
+        mlruns_path = Path.cwd() / mlruns_path
+
+    matches = sorted(mlruns_path.glob(f"*/{run_id}/artifacts/model/MLmodel"))
+    if matches:
+        return str(matches[0].parent)
+
+    return f"runs:/{run_id}/model"
 
 
 def make_inference_dataset(
