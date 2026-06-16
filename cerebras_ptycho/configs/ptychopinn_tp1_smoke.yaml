@@ -1,0 +1,37 @@
+trainer:
+  init:
+    backend:
+      backend_type: CSX
+    model_dir: ./model_dir_ptychopinn_tp1
+    seed: 1
+    model:
+      name: "cerebras_ptycho.model.PtychoPINNWaferSmokeModel"
+      bundle_dir: "cerebras_bundle/TP1_PS_TP1"
+      require_checkpoint: true
+    optimizer:
+      AdamW:
+        weight_decay: 0.0
+        learning_rate: 1.0e-6
+    schedulers:
+    - ConstantLR:
+        learning_rate: 1.0e-6
+    precision:
+      enabled: true
+      fp16_type: cbfloat16
+      loss_scaling_factor: dynamic
+    loop:
+      max_steps: 1
+      eval_frequency: 1
+      eval_steps: 1
+    checkpoint:
+      steps: 1
+      save_initial_checkpoint: false
+    logging:
+      log_steps: 1
+  fit:
+    train_dataloader:
+      data_processor: "cerebras_ptycho.input.PtychoSyntheticDataProcessor"
+      batch_size: 1
+      num_samples: 2
+      channels: 4
+      image_size: 64
