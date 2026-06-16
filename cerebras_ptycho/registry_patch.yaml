@@ -1,0 +1,10 @@
+# Add this entry to:
+#   ~/R_2.10.0/modelzoo/src/cerebras/modelzoo/registry/registry.yaml
+#
+# It lets cszoo resolve:
+#   trainer.init.model.name: "ptychopinn"
+#
+# If the surrounding registry entries use a different key name than `path`,
+# mirror the local style from an existing simple model such as `fc_mnist`.
+ptychopinn:
+  path: cerebras_ptycho.model.PtychoPINNWaferSmokeModel

@@ -5,7 +5,7 @@ trainer:
     model_dir: ./model_dir_ptychopinn_tp1
     seed: 1
     model:
-      name: "cerebras_ptycho.model.PtychoPINNWaferSmokeModel"
+      name: "ptychopinn"
       bundle_dir: "cerebras_bundle/TP1_PS_TP1"
       require_checkpoint: true
     optimizer:
