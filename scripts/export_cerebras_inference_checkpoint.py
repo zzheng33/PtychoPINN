@@ -28,6 +28,9 @@ from ptychopinn_torch.utils import load_all_configs_from_mlflow  # noqa: E402
 from scripts.run_inference import MODEL_IDS, resolve_run_id  # noqa: E402
 
 
+os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
+
+
 def dataclass_to_clean_dict(value):
     if not is_dataclass(value):
         raise TypeError(f"Expected dataclass config, got {type(value)}")
@@ -37,6 +40,18 @@ def dataclass_to_clean_dict(value):
             continue
         result[key] = item
     return result
+
+
+def resolve_local_model_uri(run_id: str, relative_mlflow_path: str) -> str:
+    mlruns_path = Path(relative_mlflow_path)
+    if not mlruns_path.is_absolute():
+        mlruns_path = Path.cwd() / mlruns_path
+
+    matches = sorted(mlruns_path.glob(f"*/{run_id}/artifacts/model/MLmodel"))
+    if matches:
+        return str(matches[0].parent)
+
+    return f"runs:/{run_id}/model"
 
 
 def main() -> int:
@@ -67,8 +82,9 @@ def main() -> int:
         configs = load_all_configs(args.config, args.file_index)
     data_config, model_config, training_config, inference_config, datagen_config = configs
 
-    print(f"Loading MLflow model runs:/{run_id}/model")
-    loaded_model = mlflow.pytorch.load_model(f"runs:/{run_id}/model", map_location=torch.device("cpu"))
+    model_uri = resolve_local_model_uri(run_id, args.mlruns)
+    print(f"Loading MLflow model from: {model_uri}")
+    loaded_model = mlflow.pytorch.load_model(model_uri, map_location=torch.device("cpu"))
     loaded_model.eval()
 
     if not hasattr(loaded_model, "model") or not hasattr(loaded_model.model, "autoencoder"):
