@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import torch
 from torch.utils.data import DataLoader, Dataset
+
+from cerebras.modelzoo.config import DataConfig
 
 
 class PtychoSyntheticDataset(Dataset):
@@ -27,19 +31,31 @@ class PtychoSyntheticDataset(Dataset):
         }
 
 
+class PtychoSyntheticDataProcessorConfig(DataConfig):
+    data_processor: Literal["PtychoSyntheticDataProcessor"]
+    batch_size: int = 1
+    num_samples: int = 2
+    channels: int = 4
+    image_size: int = 64
+
+
 class PtychoSyntheticDataProcessor:
-    def __init__(self, params):
-        self.params = params or {}
+    def __init__(self, config: PtychoSyntheticDataProcessorConfig):
+        if isinstance(config, dict):
+            if "params" in config:
+                config = config["params"]
+            config = PtychoSyntheticDataProcessorConfig(**config)
+        self.config = config
 
     def create_dataloader(self):
         dataset = PtychoSyntheticDataset(
-            num_samples=self.params.get("num_samples", 8),
-            channels=self.params.get("channels", 4),
-            image_size=self.params.get("image_size", 64),
+            num_samples=self.config.num_samples,
+            channels=self.config.channels,
+            image_size=self.config.image_size,
         )
         return DataLoader(
             dataset,
-            batch_size=self.params.get("batch_size", 1),
+            batch_size=self.config.batch_size,
             shuffle=False,
             drop_last=True,
             num_workers=0,

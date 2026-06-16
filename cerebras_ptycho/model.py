@@ -4,23 +4,33 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
 import torch
 from torch import nn
 
+from cerebras.modelzoo.config import ModelConfig
 from cerebras_ptycho.modeling import RealImagAutoencoder, namespace_from_dict
 
 
-def _config_get(config, key, default=None):
-    if isinstance(config, dict):
-        return config.get(key, default)
-    return getattr(config, key, default)
+class PtychoPINNWaferSmokeModelConfig(ModelConfig):
+    name: Literal["ptychopinn"]
+    bundle_dir: str = "cerebras_bundle/TP1_PS_TP1"
+    require_checkpoint: bool = True
+
+    @property
+    def __model_cls__(self):
+        return PtychoPINNWaferSmokeModel
 
 
 class PtychoPINNWaferSmokeModel(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config: PtychoPINNWaferSmokeModelConfig):
+        if isinstance(config, dict):
+            if "model" in config:
+                config = config["model"]
+            config = PtychoPINNWaferSmokeModelConfig(**config)
         super().__init__()
-        bundle_dir = Path(_config_get(config, "bundle_dir", "cerebras_bundle/TP1_PS_TP1"))
+        bundle_dir = Path(config.bundle_dir)
         with (bundle_dir / "configs.json").open("r") as f:
             bundle_config = json.load(f)
 
@@ -32,7 +42,7 @@ class PtychoPINNWaferSmokeModel(nn.Module):
         if state_path.exists():
             state = torch.load(state_path, map_location="cpu")
             self.model.autoencoder.load_state_dict(state)
-        elif _config_get(config, "require_checkpoint", False):
+        elif config.require_checkpoint:
             raise FileNotFoundError(f"Missing exported autoencoder checkpoint: {state_path}")
 
     def forward(self, data):
