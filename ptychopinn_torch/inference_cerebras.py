@@ -26,6 +26,8 @@ from ptychopinn_torch.utils import load_all_configs_from_mlflow
 
 OutputFormat = Literal["realimag", "amp_phase"]
 
+os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
+
 
 class RealTensorInferenceWrapper(nn.Module):
     """Wrap a trained PtychoPINN Lightning model for real-valued inference.
