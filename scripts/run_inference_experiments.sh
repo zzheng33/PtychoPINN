@@ -7,19 +7,31 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Edit these defaults for your experiment sweep.
 DATASETS=(TP1 TP2 IC1 IC2 NCM FLY1 LFP W LCLS)
-BATCH_SIZES=(1 8 16 32 64 128 256 512 1024)
-DEVICE="cuda"
-VENDOR="auto"
-DEVICES=""
-INTERVAL="0.2"
-WARMUP_SECONDS="0.5"
-CONDA_ENV="ptychopinn_torch"
+DATASETS=(IC2)
+BATCH_SIZES=(32 64 128 256 512 1024)
+BATCH_SIZES=(1024)
+DEVICE="${DEVICE:-cuda}"
+VENDOR="${VENDOR:-auto}"
+DEVICES="${DEVICES:-0}"
+INTERVAL="${INTERVAL:-0.2}"
+WARMUP_SECONDS="${WARMUP_SECONDS:-0.5}"
+CONDA_ENV="${CONDA_ENV:-ptychopinn_torch}"
 PYTHON_BIN="${PYTHON_BIN:-}"
-GPU_LABEL=""
-OUTPUT_ROOT="power_experiments"
-CONTINUE_ON_ERROR="false"
+GPU_LABEL="${GPU_LABEL:-}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-power_experiments}"
+CONTINUE_ON_ERROR="${CONTINUE_ON_ERROR:-false}"
+TEST="${TEST:-false}"
+CONDA_BASE="${CONDA_BASE:-${HOME}/miniforge3}"
 
 cd "${REPO_ROOT}"
+
+if [[ -z "${PYTHON_BIN}" && -f "${CONDA_BASE}/etc/profile.d/conda.sh" ]]; then
+  set +u
+  # shellcheck disable=SC1091
+  source "${CONDA_BASE}/etc/profile.d/conda.sh"
+  conda activate "${CONDA_ENV}"
+  set -u
+fi
 
 if [[ -z "${PYTHON_BIN}" ]]; then
   if [[ -n "${CONDA_PREFIX:-}" && -x "${CONDA_PREFIX}/bin/python" ]]; then
@@ -49,11 +61,6 @@ fi
 
 echo "Using Python: ${PYTHON_BIN}"
 
-if [[ "$#" -gt 0 ]]; then
-  "${PYTHON_BIN}" scripts/run_inference_experiments.py "$@"
-  exit 0
-fi
-
 CMD=(
   "${PYTHON_BIN}" scripts/run_inference_experiments.py
   --datasets "${DATASETS[@]}"
@@ -76,6 +83,14 @@ fi
 
 if [[ "${CONTINUE_ON_ERROR}" == "true" ]]; then
   CMD+=(--continue-on-error)
+fi
+
+if [[ "${TEST}" == "true" ]]; then
+  CMD+=(--test)
+fi
+
+if [[ "$#" -gt 0 ]]; then
+  CMD+=("$@")
 fi
 
 "${CMD[@]}"

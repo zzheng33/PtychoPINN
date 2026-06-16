@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import gc
+import shutil
 import sys
 from pathlib import Path
 
@@ -90,6 +92,19 @@ def resolve_run_id(model_key: str | None, run_id: str | None, dataset: str) -> t
     return MODEL_IDS[model_key], model_key
 
 
+def cleanup_inference_memmap(output_dir: Path, memmap_dir: Path | None = None) -> None:
+    memmap_dir = memmap_dir or output_dir / "_memmap"
+    state_file = memmap_dir.parent / f"{memmap_dir.name}_state_files.npz"
+
+    gc.collect()
+    if memmap_dir.exists():
+        shutil.rmtree(memmap_dir)
+        print(f"Deleted memmap cache: {memmap_dir}")
+    if state_file.exists():
+        state_file.unlink()
+        print(f"Deleted memmap state: {state_file}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="TP1", help="Dataset key or directory path.")
@@ -99,6 +114,22 @@ def main() -> None:
     parser.add_argument("--file-index", type=int, default=0)
     parser.add_argument("--batch-size", type=int, default=None, help="Inference batch size override.")
     parser.add_argument("--output-dir", type=Path, default=Path("inference_outputs"))
+    parser.add_argument(
+        "--memmap-dir",
+        type=Path,
+        default=None,
+        help="Reusable memmap cache directory. Defaults to a sibling _memmap next to output-dir.",
+    )
+    parser.add_argument(
+        "--remake-map",
+        action="store_true",
+        help="Force recreation of the memmap cache before inference.",
+    )
+    parser.add_argument(
+        "--cleanup-memmap",
+        action="store_true",
+        help="Delete the generated _memmap cache after saving inference outputs.",
+    )
     parser.add_argument(
         "--device",
         choices=("auto", "cpu", "cuda"),
@@ -120,6 +151,10 @@ def main() -> None:
         device = "cpu"
     if device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested with --device cuda, but torch.cuda.is_available() is False.")
+    if device == "cuda":
+        torch.cuda.set_device(0)
+        print(f"torch visible GPUs: {torch.cuda.device_count()}")
+        print(f"torch current GPU:  {torch.cuda.current_device()} ({torch.cuda.get_device_name(0)})")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     plot_name = f"{args.dataset}_{model_name}_comparison.svg"
@@ -142,6 +177,8 @@ def main() -> None:
         verbose=True,
         device=device,
         batch_size=args.batch_size,
+        data_dir=str(args.memmap_dir) if args.memmap_dir is not None else None,
+        remake_map=args.remake_map,
     )
 
     result_cpu = result.detach().cpu().numpy()
@@ -156,6 +193,8 @@ def main() -> None:
         run_id=run_id,
     )
     print(f"Saved reconstruction: {npz_path}")
+    if args.cleanup_memmap:
+        cleanup_inference_memmap(args.output_dir, args.memmap_dir)
 
 
 if __name__ == "__main__":

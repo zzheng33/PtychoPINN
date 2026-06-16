@@ -5,23 +5,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Edit these defaults for your ARM/Grace experiment sweep.
-DATASETS=(TP1 TP2 IC1 IC2 NCM FLY1 LFP W LCLS)
-BATCH_SIZES=(1 8 16 32 64 128 256 512 1024)
+# DATASETS=(TP1 TP2 IC1 IC2 NCM FLY1 LFP W LCLS)
+DATASETS=(IC2)
+BATCH_SIZES=(32 64 128 256 512 1024)
+BATCH_SIZES=(1024)
 DEVICE="cuda"
 VENDOR="auto"
-DEVICES=""
+DEVICES="${DEVICES:-0}"
 INTERVAL="0.2"
 WARMUP_SECONDS="0.5"
 CONDA_ENV="ptychopinn_torch_arm"
 PYTHON_BIN="${PYTHON_BIN:-}"
-GPU_LABEL="GH200"
+GPU_LABEL=""
 OUTPUT_ROOT="power_experiments"
 CONTINUE_ON_ERROR="false"
+TEST="${TEST:-false}"
 
 MODULE_PATH="/soft/modulefiles"
 CONDA_MODULE="conda/nvidia/suse15.6/2025.01-11"
 CUDA_MODULE="cuda/12.9.1"
 
+set +u
 if ! command -v module >/dev/null 2>&1; then
   if [[ -f /etc/profile.d/modules.sh ]]; then
     # shellcheck disable=SC1091
@@ -34,12 +38,11 @@ module load "${CUDA_MODULE}"
 module load "${CONDA_MODULE}"
 
 if command -v conda >/dev/null 2>&1; then
-  set +u
   # shellcheck disable=SC1091
   source "$(conda info --base)/etc/profile.d/conda.sh"
   conda activate "${CONDA_ENV}"
-  set -u
 fi
+set -u
 
 cd "${REPO_ROOT}"
 
@@ -63,11 +66,6 @@ fi
 
 echo "Using Python: ${PYTHON_BIN}"
 
-if [[ "$#" -gt 0 ]]; then
-  "${PYTHON_BIN}" scripts/run_inference_experiments.py "$@"
-  exit 0
-fi
-
 CMD=(
   "${PYTHON_BIN}" scripts/run_inference_experiments.py
   --datasets "${DATASETS[@]}"
@@ -90,6 +88,14 @@ fi
 
 if [[ "${CONTINUE_ON_ERROR}" == "true" ]]; then
   CMD+=(--continue-on-error)
+fi
+
+if [[ "${TEST}" == "true" ]]; then
+  CMD+=(--test)
+fi
+
+if [[ "$#" -gt 0 ]]; then
+  CMD+=("$@")
 fi
 
 "${CMD[@]}"

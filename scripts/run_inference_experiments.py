@@ -23,6 +23,7 @@ def safe_name(value: str) -> str:
 def short_gpu_name(name: str) -> str:
     normalized = name.upper().replace("_", " ").replace("-", " ")
     known_names = (
+        "V100",
         "A100",
         "H100",
         "H200",
@@ -71,6 +72,10 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
     dataset_dir.mkdir(parents=True, exist_ok=True)
     power_csv = dataset_dir / f"bs{batch_size}_power.csv"
     output_dir = dataset_dir / f"bs{batch_size}_outputs"
+    if args.memmap_root:
+        memmap_dir = args.memmap_root / safe_name(args.gpu_label) / safe_name(dataset) / "_memmap"
+    else:
+        memmap_dir = dataset_dir / "_memmap"
 
     monitor_cmd = [
         sys.executable,
@@ -98,7 +103,13 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
         str(batch_size),
         "--output-dir",
         str(output_dir),
+        "--memmap-dir",
+        str(memmap_dir),
     ]
+    if args.remake_map:
+        inference_cmd.append("--remake-map")
+    if args.cleanup_memmap:
+        inference_cmd.append("--cleanup-memmap")
     if args.model_key:
         inference_cmd.extend(["--model-key", args.model_key])
     if args.run_id:
@@ -106,24 +117,34 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
     if args.config:
         inference_cmd.extend(["--config", args.config])
 
-    print(f"Starting monitor: {power_csv}", flush=True)
-    monitor = subprocess.Popen(monitor_cmd, cwd=REPO_ROOT)
-    time.sleep(args.warmup_seconds)
+    monitor = None
+    if args.test:
+        print("Test mode: skipping GPU power monitor and CSV output.", flush=True)
+    else:
+        print(f"Starting monitor: {power_csv}", flush=True)
+        monitor = subprocess.Popen(monitor_cmd, cwd=REPO_ROOT)
+        time.sleep(args.warmup_seconds)
 
-    start = time.time()
     completed = None
     env = os.environ.copy()
     env["MLFLOW_ALLOW_FILE_STORE"] = "true"
+    if args.devices:
+        env["CUDA_VISIBLE_DEVICES"] = args.devices
+        env["HIP_VISIBLE_DEVICES"] = args.devices
+        env["ROCR_VISIBLE_DEVICES"] = args.devices
+        env["GPU_DEVICE_ORDINAL"] = args.devices
     try:
         print(f"Running inference: dataset={dataset}, batch_size={batch_size}", flush=True)
+        start = time.time()
         completed = subprocess.run(inference_cmd, cwd=REPO_ROOT, env=env)
     finally:
-        monitor.terminate()
-        try:
-            monitor.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            monitor.kill()
-            monitor.wait()
+        if monitor is not None:
+            monitor.terminate()
+            try:
+                monitor.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                monitor.kill()
+                monitor.wait()
 
     end = time.time()
     return {
@@ -136,7 +157,7 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
         "devices": args.devices or "all",
         "returncode": completed.returncode if completed is not None else 1,
         "duration_s": f"{end - start:.6f}",
-        "power_csv": str(power_csv),
+        "power_csv": "" if args.test else str(power_csv),
         "output_dir": str(output_dir),
     }
 
@@ -159,9 +180,38 @@ def main() -> int:
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--config", default=None)
     parser.add_argument("--output-root", type=Path, default=Path("power_experiments"))
+    parser.add_argument(
+        "--memmap-root",
+        type=Path,
+        default=Path(os.environ["MEMMAP_ROOT"]) if os.environ.get("MEMMAP_ROOT") else None,
+        help="Optional root for generated TensorDict _memmap caches, e.g. /tmp/ptycho_memmap.",
+    )
     parser.add_argument("--gpu-label", default=None, help="Manual output-folder GPU label, e.g. A100 or MI300X.")
     parser.add_argument("--continue-on-error", action="store_true")
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Run inference without starting the GPU power monitor or writing bs*_power.csv files.",
+    )
+    parser.add_argument(
+        "--keep-memmap",
+        action="store_true",
+        help="Keep reusable dataset-level _memmap caches instead of deleting them after each batch-size run.",
+    )
+    parser.add_argument(
+        "--cleanup-memmap",
+        action="store_true",
+        default=True,
+        help="Delete the reusable dataset-level _memmap cache after each batch-size run. This is the default.",
+    )
+    parser.add_argument(
+        "--remake-map",
+        action="store_true",
+        help="Force recreation of the dataset-level _memmap cache before each run.",
+    )
     args = parser.parse_args()
+    if args.keep_memmap:
+        args.cleanup_memmap = False
 
     detected_vendor, gpu_label = detect_gpu_label(args)
     args.detected_vendor = detected_vendor

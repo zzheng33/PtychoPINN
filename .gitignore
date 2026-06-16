@@ -10,7 +10,8 @@ manuscript_figures
 mlruns
 mlruns_raw
 data
+**/_memmap/
+**/_memmap_state_files.npz
 ptychopinn_torch/configs/*
 !ptychopinn_torch/configs/demo_configs/
-
 

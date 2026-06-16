@@ -487,7 +487,9 @@ def reconstruct_image_barycentric(model: nn.Module,
         Tuple of (reconstructed_canvas, dataset_subset)
     """
     
-    gpu_ids = list(range(torch.cuda.device_count()))
+    # Respect the caller-provided GPU list. Visible devices are controlled by
+    # CUDA_VISIBLE_DEVICES/HIP_VISIBLE_DEVICES in the experiment scripts.
+    # gpu_ids = list(range(torch.cuda.device_count()))
 
     # Setup model (single or multi-GPU)
     if gpu_ids is None or len(gpu_ids) <= 1:

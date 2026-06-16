@@ -59,16 +59,18 @@ def load_all_configs(config_path, file_index):
 
 #Loads model, training settings
 def load_and_predict(run_id,
-                     ptycho_files_dir,
-                     relative_mlflow_path = 'mlruns',
-                     config_override_path = None,
-                     file_index = 0,
-                     save_dir = "inference/output",
-                     plot_name = "Test",
-                     verbose = False,
-                     remote_server = False,
-                     device = None,
-                     batch_size = None):
+	                     ptycho_files_dir,
+	                     relative_mlflow_path = 'mlruns',
+	                     config_override_path = None,
+	                     file_index = 0,
+	                     save_dir = "inference/output",
+	                     plot_name = "Test",
+	                     verbose = False,
+	                     remote_server = False,
+	                     device = None,
+	                     batch_size = None,
+	                     data_dir = None,
+	                     remake_map = False):
     '''
     Given MLFlow run id, as well as ptycho file directory, will provide predictions 
     Args:
@@ -116,8 +118,10 @@ def load_and_predict(run_id,
 
     #Load data into dataset structure
     data_load_start = time.time()
+    if data_dir is None:
+        data_dir = os.path.join(os.path.dirname(os.path.abspath(save_dir)), "_memmap")
     ptycho_dataset = PtychoDataset(ptycho_files_dir, model_config, data_config,
-                                remake_map=True)
+	                                data_dir=data_dir, remake_map=remake_map)
     
     data_load_time = time.time() - data_load_start
 
@@ -223,6 +227,3 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"Inference failed because of: {str(e)}")
         sys.exit(1)
-
-
-

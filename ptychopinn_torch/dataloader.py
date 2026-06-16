@@ -26,6 +26,19 @@ from ptychopinn_torch.config_params import TrainingConfig, DataConfig, ModelConf
 import ptychopinn_torch.helper as hh
 
 # --- Helper functions for the dataloader ---
+def read_npy_shape(npy):
+    version = np.lib.format.read_magic(npy)
+    if version == (1, 0):
+        shape, _, _ = np.lib.format.read_array_header_1_0(npy)
+    elif version == (2, 0):
+        shape, _, _ = np.lib.format.read_array_header_2_0(npy)
+    elif hasattr(np.lib.format, "read_array_header_2_0"):
+        shape, _, _ = np.lib.format.read_array_header_2_0(npy)
+    else:
+        shape, _, _ = np.lib.format._read_array_header(npy, version)
+    return shape
+
+
 def npz_headers(npz):
     """
     Takes a path to an .npz file, which is a Zip archive of .npy files.
@@ -45,9 +58,7 @@ def npz_headers(npz):
         for name in archive.namelist():
             if name.startswith('diff3d') and name.endswith('.npy'):
                 npy = archive.open(name)
-                version = np.lib.format.read_magic(npy)
-                shape, _, _ = np.lib.format._read_array_header(npy, version)
-                diff3d_shape = shape
+                diff3d_shape = read_npy_shape(npy)
                 npy_header_found = True
                 break # Found the primary data shape
 
@@ -94,6 +105,13 @@ def is_ddp_initialized_and_active():
 def get_current_rank():
     return dist.get_rank() if dist.is_available() and dist.is_initialized() else 0
 
+def dataset_profile_enabled():
+    return os.environ.get("PTYCHO_DATASET_PROFILE", "").lower() in ("1", "true", "yes", "on")
+
+def profile_elapsed(enabled, label, start):
+    if enabled:
+        print("[PtychoDataset profile] {}: {:.6f} s".format(label, time.time() - start), flush=True)
+
 # --- Actual Dataset Class ---
 
 class PtychoDataset(Dataset):
@@ -123,6 +141,9 @@ class PtychoDataset(Dataset):
     """
     def __init__(self, ptycho_dir: str, model_config: 'ModelConfig', data_config: 'DataConfig',
                  data_dir: str = 'data/memmap', remake_map: bool = False):
+        profile = dataset_profile_enabled()
+        init_start = time.time()
+        section_start = time.time()
         
         # --- Initial loading ---
         self.model_config = model_config
@@ -134,13 +155,14 @@ class PtychoDataset(Dataset):
         # --- File paths and initial attribute setup ---
         self.ptycho_dir = ptycho_dir
         if not os.path.exists(data_dir):
-            os.mkdir(data_dir)
+            os.makedirs(data_dir, exist_ok=True)
         self.data_dir = data_dir # Storing the string if needed, otherwise data_dir_path is primary
         self.data_dir_path = Path(data_dir)
-        data_prefix_path = self.data_dir_path.parent
-        self.state_path = data_prefix_path / 'state_files.npz' # State files contain data_dict from Rank 0 (see below)
+        self.state_path = self.data_dir_path.parent / f"{self.data_dir_path.name}_state_files.npz"
+        profile_elapsed(profile, "__init__ setup", section_start)
         
         # Find npz files, try except because of distributed data parallel hang-up
+        section_start = time.time()
         try:
             self.file_list = sorted(list(Path(self.ptycho_dir).glob('*.npz')))
             self.n_files = len(self.file_list)
@@ -150,8 +172,10 @@ class PtychoDataset(Dataset):
             if self.current_rank == 0: # Only rank 0 should make the decision to halt all processes
                 print(f"[Rank 0] ERROR during NPZ file listing: {e}")
                 raise
+        profile_elapsed(profile, "file listing", section_start)
 
         # Calculate length of total memory map, with try/except for ddp
+        section_start = time.time()
         try:
             self.length, self.im_shape, self.cum_length, self.valid_indices_per_file = self.calculate_length()
             if self.length == 0 and self.current_rank == 0:
@@ -160,31 +184,44 @@ class PtychoDataset(Dataset):
             if self.current_rank == 0:
                 print(f"[Rank 0] ERROR in calculate_length(): {e}")
                 raise
+        profile_elapsed(profile, "calculate_length", section_start)
 
         # --- Coordinated Memory Map Creation/Loading (Multi-GPU, Rank 0 orchestrates) ---
         # This is set up so the memory map is ONLY created from Rank 0 and isn't duplicated. All ranks 
         # (i.e. GPUs) will access the same memory map that was initialized by Rank 0.
         if self.current_rank == 0:
+            section_start = time.time()
             create_the_map_on_rank_0 = False
             map_files_exist = self.data_dir_path.exists() and any(self.data_dir_path.iterdir())
             state_file_exists = self.state_path.exists()
 
             if remake_map or not map_files_exist or not state_file_exists:
                 create_the_map_on_rank_0 = True
+            profile_elapsed(profile, "map existence check", section_start)
             
             if create_the_map_on_rank_0: #Creates memory map only at Rank 0. All other ranks wait at barrier
                 try:
-                    data_prefix_path.mkdir(parents=True, exist_ok=True)
+                    section_start = time.time()
+                    self.data_dir_path.parent.mkdir(parents=True, exist_ok=True)
                     self.data_dir_path.mkdir(parents=True, exist_ok=True)
+                    profile_elapsed(profile, "map directory setup", section_start)
+                    section_start = time.time()
                     self.memory_map_data(self.file_list)
-                    np.savez(self.state_path, data_dict=self.data_dict, length=self.length)
+                    profile_elapsed(profile, "memory_map_data", section_start)
+                    section_start = time.time()
+                    tmp_state_path = self.state_path.with_suffix(".tmp.npz")
+                    np.savez(tmp_state_path, data_dict=self.data_dict, length=self.length)
+                    os.replace(tmp_state_path, self.state_path)
+                    profile_elapsed(profile, "save state file", section_start)
                 except Exception as e:
                     print(f"[Rank 0] FATAL ERROR during map creation/saving: {e}")
                     raise # This will halt rank 0; other ranks will time out at barrier.
 
         # --- Barrier for DDP synchronization ---
         if self.is_ddp_active:
+            section_start = time.time()
             dist.barrier()
+            profile_elapsed(profile, "DDP barrier", section_start)
 
         # --- Load map and state for ALL ranks ---
         # All ranks must execute this to get handles to the memory map.
@@ -194,12 +231,16 @@ class PtychoDataset(Dataset):
                 raise FileNotFoundError(f"[Rank {self.current_rank}] Critical map/state files missing after barrier. "
                                         f"Map dir: {self.data_dir_path} (exists: {self.data_dir_path.exists()}), "
                                         f"State file: {self.state_path} (exists: {self.state_path.exists()})")
+            section_start = time.time()
             self.mmap_ptycho = TensorDict.load_memmap(str(self.data_dir_path)) # Load memory map that was initialized by Rank 0
+            profile_elapsed(profile, "TensorDict.load_memmap", section_start)
+            section_start = time.time()
             loaded_state = np.load(self.state_path, allow_pickle=True)
             self.data_dict = loaded_state['data_dict'].item()
             if 'length' in loaded_state:
                 self.length = int(loaded_state['length'])
                 self.mmap_ptycho = self.mmap_ptycho[:self.length]
+            profile_elapsed(profile, "load state file", section_start)
 
         except Exception as e:
             print(f"[Rank {self.current_rank}] FATAL ERROR loading map files or state AFTER barrier: {e}")
@@ -208,6 +249,7 @@ class PtychoDataset(Dataset):
         # Minimal success log, good for confirming init completion on all ranks
         if self.current_rank == 0:
              print(f"[PtychoDataset Rank 0] Initialization successful. Dataset length: {self.length}.")
+        profile_elapsed(profile, "__init__ total", init_start)
 
     def calculate_length(self):
         """
@@ -219,6 +261,8 @@ class PtychoDataset(Dataset):
         Also calculates cumulative length for linear indexing based on *filtered* counts.
         Stores the valid indices per file for reuse in memory_map_data.
         """
+        profile = dataset_profile_enabled()
+        total_start = time.time()
         total_length = 0
         cumulative_length = [0]
         first_im_shape = None
@@ -232,11 +276,14 @@ class PtychoDataset(Dataset):
              raise ValueError(f"Invalid y_bounds: {self.data_config.y_bounds}. Must be [min_pct, max_pct] between 0.0 and 1.0.")
 
         for i, npz_file in enumerate(self.file_list): # Use ordered list
+            file_start = time.time()
+            section_start = time.time()
             try:
                 tensor_shape, xcoords, ycoords = npz_headers(npz_file)
             except Exception as e:
                 print(f"Error processing headers/coords for {npz_file}: {e}")
                 continue # Skip problematic files or raise error
+            profile_elapsed(profile, "calculate_length file {} npz_headers".format(npz_file.name), section_start)
 
             if i == 0:
                 first_im_shape = tensor_shape[1:] # Get H, W from the first file
@@ -289,10 +336,12 @@ class PtychoDataset(Dataset):
             length_contribution = n_valid_points * multiplier
             total_length += length_contribution
             cumulative_length.append(total_length)
+            profile_elapsed(profile, "calculate_length file {} total".format(npz_file.name), file_start)
 
         if first_im_shape is None:
              raise ValueError("Could not determine image shape from any NPZ file.")
 
+        profile_elapsed(profile, "calculate_length total", total_start)
         return total_length, first_im_shape, cumulative_length, valid_indices_per_file
 
     # Methods for diffraction data mapping
@@ -319,6 +368,8 @@ class PtychoDataset(Dataset):
             grid_size - tuple of image grid size (e.g. 2 x 2 is most used)
 
         """
+        profile = dataset_profile_enabled()
+        total_start = time.time()
         #Config grabbing/setting using stored configs
         if self.model_config.object_big:
             n_channels = self.data_config.grid_size[0] * self.data_config.grid_size[1]
@@ -397,8 +448,10 @@ class PtychoDataset(Dataset):
         print("Memory map creation time: {}".format(end - start))
 
         #Lock memory map, ensure proper pathing
+        section_start = time.time()
         mmap_ptycho = mmap_ptycho.memmap_like(prefix=self.data_dir)
         mmap_ptycho = fix_tensordict_memmap_state(mmap_ptycho, self.data_dir)
+        profile_elapsed(profile, "memory_map_data memmap_like", section_start)
 
         #Go through each npz file and populate mmap_diffraction
         batch_size = 3000 #Batch size for writing diffraction tensors to memory map
@@ -428,6 +481,7 @@ class PtychoDataset(Dataset):
         
         # Iterate through all npz files in directory
         for i, npz_file in enumerate(image_paths):
+            file_start = time.time()
 
             print("Populating memory map for dataset {}".format(i))
             #Calculating all non-diffraction related parameters/tensors
@@ -441,6 +495,7 @@ class PtychoDataset(Dataset):
             non_diff_timer_start = time.time()
 
             #Load coordinates
+            section_start = time.time()
             xcoords_full = np.load(npz_file)['xcoords']
             ycoords_full = np.load(npz_file)['ycoords']
 
@@ -448,11 +503,13 @@ class PtychoDataset(Dataset):
             xcoords = xcoords_full[self.valid_indices_per_file[i]]
             ycoords = ycoords_full[self.valid_indices_per_file[i]]
             self.data_dict['com'] = torch.from_numpy(np.array([xcoords.mean(), ycoords.mean()])) #Center of mass (see reassembly.py)
+            profile_elapsed(profile, "memory_map_data dataset {} load/filter coords".format(i), section_start)
     
             #--- Coordinate patches/Supervised Labels ---
             # Note that object_big = True means we are enforcing ptychographic constraints and need to group coordinates
             if self.model_config.mode == 'Unsupervised' and self.model_config.object_big: # PtychoPINN/Ptychography Constraint
                 #Get indices for coordinate groups using defined neighbor function
+                section_start = time.time()
                 nn_indices, coords_nn = group_coords(xcoords_full, ycoords_full,
                                                     xcoords, ycoords,
                                                     neighbor_function,
@@ -462,9 +519,11 @@ class PtychoDataset(Dataset):
                 
                 #Get relative and center of mass coordinates for each coordinate group
                 coords_com, coords_relative = get_relative_coords(coords_nn)
+                profile_elapsed(profile, "memory_map_data dataset {} group coords".format(i), section_start)
                 actual_count = len(nn_indices)
                 end = start + actual_count
                 print(f"Actual grouped rows for dataset: {actual_count}")
+                section_start = time.time()
                 mmap_ptycho["coords_center"][start:end] = torch.from_numpy(coords_com)
                 mmap_ptycho["coords_relative"][start:end] = torch.from_numpy(coords_relative)
                 mmap_ptycho["nn_indices"][start:end] = torch.from_numpy(nn_indices)
@@ -475,10 +534,12 @@ class PtychoDataset(Dataset):
                                                         ycoords_full],axis=1)).to(torch.float32)
                 
                 mmap_ptycho["coords_global"][start:end] = regular_global_coords[nn_indices].unsqueeze(2)
+                profile_elapsed(profile, "memory_map_data dataset {} write grouped coord tensors".format(i), section_start)
             
             else: #Unsupervised CDI or supervised learning
 
                 #Otherwise, the indices are just an arange from 0 to N-1
+                section_start = time.time()
                 nn_indices = self.valid_indices_per_file[i]
                 actual_count = len(nn_indices)
                 end = start + actual_count
@@ -509,11 +570,15 @@ class PtychoDataset(Dataset):
                     #Write rescaled labels to memory map, complex not supported by MemoryMappedTensor.
                     mmap_ptycho["label_amp"][start:end] = torch.from_numpy(valid_label_amp)
                     mmap_ptycho["label_phase"][start:end] = torch.from_numpy(valid_label_phase)
+                profile_elapsed(profile, "memory_map_data dataset {} write simple coord/label tensors".format(i), section_start)
 
             #Mapping experiment Ids
+            section_start = time.time()
             mmap_ptycho["experiment_id"][start:end] = torch.tensor(i)
+            profile_elapsed(profile, "memory_map_data dataset {} write experiment ids".format(i), section_start)
 
             #Mapping probes
+            section_start = time.time()
             probe_data = np.load(npz_file)['probeGuess']
             #Optional: normalize probe for forward model to be photon agnostic. We almost always normalize.
             if len(probe_data.shape) == 2:
@@ -527,11 +592,14 @@ class PtychoDataset(Dataset):
                 
             n_modes = probe_data.shape[0]
             self.data_dict['probes'][i,:n_modes] = torch.from_numpy(probe_data).to(torch.complex64)
+            profile_elapsed(profile, "memory_map_data dataset {} load/store probe".format(i), section_start)
 
             #Object
+            section_start = time.time()
             objectGuess = np.load(npz_file)['objectGuess']
             if int(objectGuess.sum().real) != (objectGuess.shape[0] * objectGuess.shape[1]): #Check if matrix of ones
                 self.data_dict['objectGuess'].append(objectGuess)
+            profile_elapsed(profile, "memory_map_data dataset {} load/store object".format(i), section_start)
             
             non_diff_time = time.time() - non_diff_timer_start
             print("Non-diffraction memory map write time: {}".format(non_diff_time))
@@ -541,16 +609,19 @@ class PtychoDataset(Dataset):
             curr_nn_index_length = len(nn_indices)
 
             #Load diffraction images
+            section_start = time.time()
             diff_stack = torch.from_numpy(np.load(npz_file)['diff3d']).round().to(torch.float32) #Round for non-photon detectors
 
             #Inserting dummy channel dimension if channel number = 1
             if not self.model_config.object_big: # Use stored config
                 diff_stack = diff_stack[:,None]
+            profile_elapsed(profile, "memory_map_data dataset {} load diff3d".format(i), section_start)
 
             #Normalizing diffraction images
             print("Getting normalization coefficients...")
             #Batch normalization if specified or you aren't using overlaps
             B = end - start #Batch size
+            section_start = time.time()
             if self.data_config.normalize == 'Batch' or (self.data_config.C == 1 and self.model_config.mode != 'Supervised'): #
                 # Calculate rms normalization factor (used in publication)
                 norm_rms_factor = hh.get_rms_scaling_factor(diff_stack, self.data_config)
@@ -567,8 +638,10 @@ class PtychoDataset(Dataset):
                 mmap_ptycho["physics_scaling_constant"][start:end] = norm_factor
                 #Legacy scaling constant
                 self.data_dict["scaling_constant"][i] = norm_factor
+            profile_elapsed(profile, "memory_map_data dataset {} normalization constants".format(i), section_start)
 
             #Write to memory mapped tensor in batches to avoid huge memory overhead
+            section_start = time.time()
             for j in range(0, curr_nn_index_length, batch_size): #Write all diffraction images for current experiment
                 #Calculate end index (to not exceed length of list)
                 local_to = min(j + batch_size, curr_nn_index_length)
@@ -588,9 +661,11 @@ class PtychoDataset(Dataset):
 
                 #Update global
                 global_from += global_to - global_from
+            profile_elapsed(profile, "memory_map_data dataset {} write image tensors".format(i), section_start)
 
             diff_time = time.time() - diff_timer_start
             print("Diffraction memory map write time: {}".format(diff_time))
+            profile_elapsed(profile, "memory_map_data dataset {} total".format(i), file_start)
         
         #Assign memory map to class attribute
         if global_from < mmap_length:
@@ -599,6 +674,7 @@ class PtychoDataset(Dataset):
             self.length = global_from
         self.mmap_ptycho = mmap_ptycho
 
+        profile_elapsed(profile, "memory_map_data total", total_start)
         return 
 
 
@@ -621,6 +697,17 @@ class PtychoDataset(Dataset):
         scaling_constant - (N) tensor, scaling constants required for each diffraction image
         
         """
+        if isinstance(idx, torch.Tensor):
+            idx = idx % len(self.mmap_ptycho)
+        elif isinstance(idx, np.ndarray):
+            idx = idx % len(self.mmap_ptycho)
+        elif isinstance(idx, (list, tuple)):
+            idx = [i % len(self.mmap_ptycho) for i in idx]
+        elif isinstance(idx, slice):
+            pass
+        else:
+            idx = idx % len(self.mmap_ptycho)
+
         #Experimental index is used to find the probe corresponding to the right experiment
         #We can then get the correct probe tensor organized according to diffraction patterns
         exp_idx = self.mmap_ptycho['experiment_id'][idx]
