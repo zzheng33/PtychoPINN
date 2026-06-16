@@ -11,10 +11,16 @@ from torch import nn
 from cerebras_ptycho.modeling import RealImagAutoencoder, namespace_from_dict
 
 
+def _config_get(config, key, default=None):
+    if isinstance(config, dict):
+        return config.get(key, default)
+    return getattr(config, key, default)
+
+
 class PtychoPINNWaferSmokeModel(nn.Module):
     def __init__(self, config):
         super().__init__()
-        bundle_dir = Path(config.get("bundle_dir", "cerebras_bundle/TP1_PS_TP1"))
+        bundle_dir = Path(_config_get(config, "bundle_dir", "cerebras_bundle/TP1_PS_TP1"))
         with (bundle_dir / "configs.json").open("r") as f:
             bundle_config = json.load(f)
 
@@ -26,7 +32,7 @@ class PtychoPINNWaferSmokeModel(nn.Module):
         if state_path.exists():
             state = torch.load(state_path, map_location="cpu")
             self.model.autoencoder.load_state_dict(state)
-        elif config.get("require_checkpoint", False):
+        elif _config_get(config, "require_checkpoint", False):
             raise FileNotFoundError(f"Missing exported autoencoder checkpoint: {state_path}")
 
     def forward(self, data):

@@ -6,8 +6,9 @@ trainer:
     seed: 1
     model:
       name: "ptychopinn"
-      bundle_dir: "cerebras_bundle/TP1_PS_TP1"
-      require_checkpoint: true
+      config:
+        bundle_dir: "cerebras_bundle/TP1_PS_TP1"
+        require_checkpoint: true
     optimizer:
       AdamW:
         weight_decay: 0.0
@@ -31,7 +32,8 @@ trainer:
   fit:
     train_dataloader:
       data_processor: "cerebras_ptycho.input.PtychoSyntheticDataProcessor"
-      batch_size: 1
-      num_samples: 2
-      channels: 4
-      image_size: 64
+      params:
+        batch_size: 1
+        num_samples: 2
+        channels: 4
+        image_size: 64
