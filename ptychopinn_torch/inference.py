@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 import argparse
 import sys
+from pathlib import Path
 
 #ML libraries
 import mlflow
@@ -54,6 +55,14 @@ def load_all_configs(config_path, file_index):
 
     return data_config, model_config, training_config, inference_config, datagen_config
 
+
+def resolve_local_mlflow_model_path(run_id: str, relative_mlflow_path: str) -> Path | None:
+    mlruns_path = Path(relative_mlflow_path).resolve()
+    candidates = sorted(mlruns_path.glob(f"*/{run_id}/artifacts/model"))
+    for candidate in candidates:
+        if (candidate / "MLmodel").exists():
+            return candidate
+    return None
 
 
 
@@ -113,7 +122,14 @@ def load_and_predict(run_id,
     #Loading model
     print("Loading model...")
     model_load_start = time.time()
-    loaded_model = mlflow.pytorch.load_model(model_uri, map_location=torch.device(device))
+    try:
+        loaded_model = mlflow.pytorch.load_model(model_uri, map_location=torch.device(device))
+    except Exception as exc:
+        local_model_path = resolve_local_mlflow_model_path(run_id, relative_mlflow_path)
+        if local_model_path is None:
+            raise
+        print(f"MLflow runs URI failed ({exc}); loading local model artifact: {local_model_path}")
+        loaded_model = mlflow.pytorch.load_model(str(local_model_path), map_location=torch.device(device))
     loaded_model.to(training_config.device)
     loaded_model.training = True
     model_load_time = time.time() - model_load_start

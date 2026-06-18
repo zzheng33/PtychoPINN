@@ -92,6 +92,9 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
     if args.devices:
         monitor_cmd.extend(["--devices", args.devices])
 
+    monitor_env = os.environ.copy()
+    monitor_env.pop("ZE_AFFINITY_MASK", None)
+
     inference_cmd = [
         sys.executable,
         str(INFERENCE_SCRIPT),
@@ -121,8 +124,15 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
     if args.test:
         print("Test mode: skipping GPU power monitor and CSV output.", flush=True)
     else:
+        preflight_csv = dataset_dir / f"bs{batch_size}_power_preflight.csv"
+        preflight_cmd = monitor_cmd.copy()
+        output_index = preflight_cmd.index("--output") + 1
+        preflight_cmd[output_index] = str(preflight_csv)
+        preflight_cmd.append("--once")
+        print(f"Power monitor preflight: {preflight_csv}", flush=True)
+        subprocess.run(preflight_cmd, cwd=REPO_ROOT, env=monitor_env, check=False)
         print(f"Starting monitor: {power_csv}", flush=True)
-        monitor = subprocess.Popen(monitor_cmd, cwd=REPO_ROOT)
+        monitor = subprocess.Popen(monitor_cmd, cwd=REPO_ROOT, env=monitor_env)
         time.sleep(args.warmup_seconds)
 
     completed = None

@@ -7,8 +7,11 @@ import argparse
 import csv
 import glob
 import math
+import os
+import re
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -100,6 +103,36 @@ def read_named_sysfs_power_watts(power_file: str) -> float:
             return float(handle.read().strip()) / 1_000_000
     except OSError:
         return math.nan
+
+
+def first_number(value: object) -> float:
+    match = re.search(r"[-+]?\d+(?:\.\d+)?", str(value))
+    if not match:
+        return math.nan
+    return float(match.group(0))
+
+
+def run_text(cmd: list[str], timeout: float = 5.0, env: dict[str, str] | None = None) -> str:
+    result = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=timeout, env=env)
+    return result.stdout
+
+
+def geopmread_cmd(*args: object) -> list[str]:
+    geopmread = shutil.which("geopmread")
+    if geopmread is None:
+        raise RuntimeError("geopmread was not found")
+    return [geopmread, *(str(arg) for arg in args)]
+
+
+def geopmread_env() -> dict[str, str]:
+    env = os.environ.copy()
+    # Aurora's /usr/bin/geopmread uses a /usr/bin/python3 shebang. If the
+    # PtychoPINN venv or Python module paths leak into that interpreter, it can
+    # import incompatible pkg_resources. Keep system paths for GEOPM libraries,
+    # but remove Python-specific overrides.
+    for name in ("PYTHONHOME", "PYTHONPATH", "PYTHONNOUSERSITE", "VIRTUAL_ENV"):
+        env.pop(name, None)
+    return env
 
 
 class NvidiaSampler:
@@ -220,29 +253,133 @@ class AmdSampler:
 
 class IntelSampler:
     vendor = "intel"
+    POWER_SIGNAL = "GPU_POWER"
+    ENERGY_SIGNAL = "GPU_ENERGY"
 
     def __init__(self, devices: list[int] | None):
-        self.power_files = find_intel_sysfs_power_files()
-        if devices is not None:
-            requested = set(devices)
-            self.power_files = [entry for entry in self.power_files if entry[0] in requested]
-        if not self.power_files:
-            raise RuntimeError("No Intel GPU sysfs power files were found")
+        if shutil.which("geopmread") is None:
+            raise RuntimeError("geopmread was not found")
+        self.devices = devices or self._discover_devices()
+        if not self.devices:
+            self.devices = [0]
+        self._last_energy: dict[int, tuple[float, float]] = {}
+
+    def _discover_devices(self) -> list[int]:
+        try:
+            text = run_text(geopmread_cmd("-d"), env=geopmread_env())
+        except Exception:
+            return [0]
+        for line in text.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == "gpu":
+                try:
+                    return list(range(int(parts[1])))
+                except ValueError:
+                    return [0]
+        return [0]
+
+    def _read_signal(self, signals: tuple[str, ...], domain: str, domain_index: int) -> float:
+        for signal in signals:
+            try:
+                return first_number(run_text(geopmread_cmd(signal, domain, domain_index), env=geopmread_env()))
+            except (subprocess.SubprocessError, ValueError):
+                continue
+        return math.nan
+
+    def _read_cached_signal(
+        self,
+        cached_signal: str | None,
+        signals: tuple[str, ...],
+        domain: str,
+        domain_index: int,
+    ) -> tuple[float, str | None]:
+        if cached_signal is not None:
+            try:
+                return first_number(run_text(geopmread_cmd(cached_signal, domain, domain_index), env=geopmread_env())), cached_signal
+            except (subprocess.SubprocessError, ValueError):
+                cached_signal = None
+        for signal in signals:
+            try:
+                return first_number(run_text(geopmread_cmd(signal, domain, domain_index), env=geopmread_env())), signal
+            except (subprocess.SubprocessError, ValueError):
+                continue
+        return math.nan, None
+
+    def _read_power(self, gpu_index: int) -> float:
+        cmd = geopmread_cmd(self.POWER_SIGNAL, "gpu", gpu_index)
+        try:
+            power = power_to_watts(first_number(run_text(cmd, env=geopmread_env())))
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip()
+            print(f"Warning: {' '.join(cmd)} failed: {stderr or exc}", file=sys.stderr, flush=True)
+            return self._read_power_from_energy(gpu_index)
+        except subprocess.SubprocessError as exc:
+            print(f"Warning: {' '.join(cmd)} failed: {exc}", file=sys.stderr, flush=True)
+            return self._read_power_from_energy(gpu_index)
+        if math.isnan(power):
+            print(f"Warning: {' '.join(cmd)} returned nan", file=sys.stderr, flush=True)
+            return self._read_power_from_energy(gpu_index)
+        return power
+
+    def _read_power_from_energy(self, gpu_index: int) -> float:
+        cmd = geopmread_cmd(self.ENERGY_SIGNAL, "gpu", gpu_index)
+        try:
+            energy_j = first_number(run_text(cmd, env=geopmread_env()))
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip()
+            print(f"Warning: {' '.join(cmd)} failed: {stderr or exc}", file=sys.stderr, flush=True)
+            return math.nan
+        except subprocess.SubprocessError as exc:
+            print(f"Warning: {' '.join(cmd)} failed: {exc}", file=sys.stderr, flush=True)
+            return math.nan
+
+        now = time.time()
+        last = self._last_energy.get(gpu_index)
+        self._last_energy[gpu_index] = (energy_j, now)
+        if last is None:
+            return math.nan
+
+        last_energy_j, last_time = last
+        elapsed = now - last_time
+        if elapsed <= 0:
+            return math.nan
+        return max((energy_j - last_energy_j) / elapsed, 0.0)
 
     def sample(self) -> list[dict[str, object]]:
         rows = []
-        for gpu_index, card_name, power_file in self.power_files:
+        for gpu_index in self.devices:
             rows.append(
                 {
                     "vendor": self.vendor,
                     "gpu_index": gpu_index,
-                    "gpu_name": card_name,
-                    "power_w": read_named_sysfs_power_watts(power_file),
+                    "gpu_name": f"geopm-gpu:{gpu_index}",
+                    "power_w": self._read_power(gpu_index),
                     "memory_used_mib": math.nan,
                     "utilization_pct": math.nan,
                 }
             )
         return rows
+
+
+class UnavailableSampler:
+    def __init__(self, vendor: str, devices: list[int] | None, reason: str):
+        self.vendor = vendor
+        self.devices = devices or [0]
+        self.reason = reason
+        print(f"Warning: {vendor} power telemetry unavailable: {reason}", file=sys.stderr, flush=True)
+
+    def sample(self) -> list[dict[str, object]]:
+        return [
+            {
+                "vendor": self.vendor,
+                "gpu_index": gpu_index,
+                "gpu_name": f"{self.vendor}:unavailable",
+                "power_w": math.nan,
+                "memory_used_mib": math.nan,
+                "utilization_pct": math.nan,
+            }
+            for gpu_index in self.devices
+        ]
 
 
 def make_sampler(vendor: str, devices: list[int] | None):
@@ -251,7 +388,10 @@ def make_sampler(vendor: str, devices: list[int] | None):
     if vendor == "amd":
         return AmdSampler(devices)
     if vendor == "intel":
-        return IntelSampler(devices)
+        try:
+            return IntelSampler(devices)
+        except RuntimeError as exc:
+            return UnavailableSampler(vendor, devices, str(exc))
 
     errors = []
     for sampler_cls in (NvidiaSampler, AmdSampler, IntelSampler):
@@ -285,10 +425,20 @@ def power_field(gpu_index: object) -> str:
     return f"GPU{gpu_index}_Power(W)"
 
 
+def format_metric(value: object, digits: int = 2) -> object:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return value
+    if math.isnan(number):
+        return "nan"
+    return f"{number:.{digits}f}"
+
+
 def rows_to_power_record(elapsed_s: float, rows: list[dict[str, object]]) -> dict[str, object]:
     record: dict[str, object] = {"Time(S)": f"{elapsed_s:.2f}"}
     for row in rows:
-        record[power_field(row["gpu_index"])] = row["power_w"]
+        record[power_field(row["gpu_index"])] = format_metric(row["power_w"], 2)
     return record
 
 
@@ -300,6 +450,7 @@ def main() -> int:
     parser.add_argument("--devices", default=None, help="Comma-separated GPU indices to monitor.")
     parser.add_argument("--label", default="")
     parser.add_argument("--list-gpus", action="store_true")
+    parser.add_argument("--once", action="store_true", help="Write one sample and exit.")
     args = parser.parse_args()
 
     devices = parse_devices(args.devices)
@@ -322,6 +473,8 @@ def main() -> int:
             writer.writeheader()
             writer.writerow(rows_to_power_record(time.time() - start, first_rows))
             handle.flush()
+            if args.once:
+                return 0
 
             while True:
                 now = time.time()
