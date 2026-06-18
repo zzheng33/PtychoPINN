@@ -5,6 +5,9 @@ __pycache__
 *.swp
 .aider*
 .vscode*
+.venv*/
+venv/
+env/
 figures
 manuscript_figures
 mlruns
@@ -14,4 +17,3 @@ data
 **/_memmap_state_files.npz
 ptychopinn_torch/configs/*
 !ptychopinn_torch/configs/demo_configs/
-

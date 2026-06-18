@@ -10,7 +10,7 @@ From the repository root on Aurora:
 bash scripts/setup_aurora_env.sh
 ```
 
-This creates `.venv-aurora` with `--system-site-packages`, so it can see the site modules:
+This creates `../ptychopinn-venvs/aurora` with `--system-site-packages`, so it can see the site modules. Set `VENV_DIR=/path/to/venv` before running the scripts if you want a different location.
 
 - `python/3.12.12`
 - `py-torch/2.10.0`
@@ -33,7 +33,7 @@ mlruns/
 If you copied the Zenodo tarballs, unpack them at the repository root. Then run:
 
 ```bash
-source .venv-aurora/bin/activate
+source ../ptychopinn-venvs/aurora/bin/activate
 python other/initialize_data.py --repo-root "$PWD" --no-dry-run
 ```
 
