@@ -133,6 +133,7 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
         env["HIP_VISIBLE_DEVICES"] = args.devices
         env["ROCR_VISIBLE_DEVICES"] = args.devices
         env["GPU_DEVICE_ORDINAL"] = args.devices
+        env["ZE_AFFINITY_MASK"] = args.devices
     try:
         print(f"Running inference: dataset={dataset}, batch_size={batch_size}", flush=True)
         start = time.time()
@@ -170,7 +171,7 @@ def main() -> int:
         default=["TP1", "TP2", "IC1", "IC2", "NCM", "FLY1", "LFP", "W", "LCLS"],
     )
     parser.add_argument("--batch-sizes", nargs="+", type=int, default=[1,2,4,8,16,32,64,128,256,512,1024] )
-    parser.add_argument("--device", default="cuda", choices=("auto", "cpu", "cuda"))
+    parser.add_argument("--device", default="cuda", choices=("auto", "cpu", "cuda", "xpu"))
     parser.add_argument("--vendor", default="auto", choices=("auto", "nvidia", "amd", "intel"))
     parser.add_argument("--devices", default=None, help="Comma-separated GPU indices to monitor.")
     parser.add_argument("--interval", type=float, default=0.2)

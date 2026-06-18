@@ -105,6 +105,9 @@ def load_and_predict(run_id,
     if str(device).startswith("cuda") and not torch.cuda.is_available():
         print("CUDA requested by config but unavailable; using CPU.")
         device = "cpu"
+    if str(device).startswith("xpu") and not (getattr(torch, "xpu", None) and torch.xpu.is_available()):
+        print("XPU requested by config but unavailable; using CPU.")
+        device = "cpu"
     training_config.device = device
 
     #Loading model

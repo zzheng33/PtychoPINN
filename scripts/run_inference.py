@@ -105,6 +105,37 @@ def cleanup_inference_memmap(output_dir: Path, memmap_dir: Path | None = None) -
         print(f"Deleted memmap state: {state_file}")
 
 
+def xpu_is_available() -> bool:
+    return bool(getattr(torch, "xpu", None) and torch.xpu.is_available())
+
+
+def resolve_device(requested_device: str) -> str:
+    if requested_device == "auto":
+        if xpu_is_available():
+            return "xpu"
+        if torch.cuda.is_available():
+            return "cuda"
+        return "cpu"
+
+    if requested_device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested with --device cuda, but torch.cuda.is_available() is False.")
+    if requested_device == "xpu" and not xpu_is_available():
+        raise RuntimeError("XPU was requested with --device xpu, but torch.xpu.is_available() is False.")
+    return requested_device
+
+
+def print_device_info(device: str) -> None:
+    if device == "cuda":
+        torch.cuda.set_device(0)
+        print(f"torch visible CUDA GPUs: {torch.cuda.device_count()}")
+        print(f"torch current CUDA GPU:  {torch.cuda.current_device()} ({torch.cuda.get_device_name(0)})")
+    elif device == "xpu":
+        torch.xpu.set_device(0)
+        device_name = torch.xpu.get_device_name(0) if hasattr(torch.xpu, "get_device_name") else "xpu:0"
+        print(f"torch visible XPU GPUs: {torch.xpu.device_count()}")
+        print(f"torch current XPU GPU:  {torch.xpu.current_device()} ({device_name})")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="TP1", help="Dataset key or directory path.")
@@ -132,9 +163,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--device",
-        choices=("auto", "cpu", "cuda"),
+        choices=("auto", "cpu", "cuda", "xpu"),
         default="auto",
-        help="Inference device. auto uses CUDA when available, otherwise CPU.",
+        help="Inference device. auto uses XPU, then CUDA, then CPU.",
     )
     parser.add_argument("--list-models", action="store_true")
     args = parser.parse_args()
@@ -146,15 +177,8 @@ def main() -> None:
 
     dataset_dir = resolve_dataset(args.dataset)
     run_id, model_name = resolve_run_id(args.model_key, args.run_id, args.dataset)
-    device = "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
-    if device == "auto":
-        device = "cpu"
-    if device == "cuda" and not torch.cuda.is_available():
-        raise RuntimeError("CUDA was requested with --device cuda, but torch.cuda.is_available() is False.")
-    if device == "cuda":
-        torch.cuda.set_device(0)
-        print(f"torch visible GPUs: {torch.cuda.device_count()}")
-        print(f"torch current GPU:  {torch.cuda.current_device()} ({torch.cuda.get_device_name(0)})")
+    device = resolve_device(args.device)
+    print_device_info(device)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     plot_name = f"{args.dataset}_{model_name}_comparison.svg"

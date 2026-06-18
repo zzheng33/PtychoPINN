@@ -510,6 +510,7 @@ def reconstruct_image_barycentric(model: nn.Module,
 
     primary_device = torch.device(primary_device)
     use_cuda = primary_device.type == 'cuda'
+    use_xpu = primary_device.type == 'xpu'
     
     # Get dataset subset
     n_files = ptycho_dset.n_files
@@ -591,6 +592,8 @@ def reconstruct_image_barycentric(model: nn.Module,
             
             if use_cuda:
                 torch.cuda.synchronize()
+            elif use_xpu:
+                torch.xpu.synchronize()
             inference_time = time.time() - inference_start
             total_inference_time += inference_time
             
@@ -638,6 +641,8 @@ def reconstruct_image_barycentric(model: nn.Module,
             if i % 5 == 0:
                 if use_cuda:
                     torch.cuda.empty_cache()
+                elif use_xpu:
+                    torch.xpu.empty_cache()
                 gc.collect()
             
             if verbose:
@@ -662,6 +667,8 @@ def reconstruct_image_barycentric(model: nn.Module,
     # Final cleanup
     if use_cuda:
         torch.cuda.empty_cache()
+    elif use_xpu:
+        torch.xpu.empty_cache()
     gc.collect()
     
     return canvas / canvas_counts, ptycho_subset, [total_inference_time, total_assembly_time]

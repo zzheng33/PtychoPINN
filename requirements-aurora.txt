@@ -1,0 +1,9 @@
+# Installed into a thin virtualenv layered on top of Aurora's PyTorch/XPU modules.
+# Do not install torch/torchvision here; load Aurora's py-torch modules instead.
+lightning
+mlflow
+tensordict
+scikit-image
+opencv-python-headless
+noise
+perlin-noise
