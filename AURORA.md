@@ -55,3 +55,28 @@ bash scripts/run_inference_experiments_aurora.sh
 ```
 
 The Aurora wrapper uses `--device xpu`, `--vendor intel`, and `ZE_AFFINITY_MASK` for device selection.
+
+Power CSV files and reconstruction outputs from the Aurora/Intel wrapper are written under:
+
+```bash
+/home/john/power_experiments
+```
+
+For example:
+
+```text
+/home/john/power_experiments/Max/TP1/bs32_power.csv
+/home/john/power_experiments/Max/TP1/bs32_outputs/
+```
+
+Generated TensorDict `_memmap` caches are written under `MEMMAP_ROOT`. The Intel PBS wrapper defaults this to node-local temporary storage:
+
+```bash
+${TMPDIR:-/tmp}/ptychopinn_memmap_${PBS_JOBID}
+```
+
+Override it when needed:
+
+```bash
+MEMMAP_ROOT=/tmp/ptychopinn_memmap_$PBS_JOBID qsub scripts/run_inference_experiments_intel.sh
+```

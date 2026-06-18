@@ -2,7 +2,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+if [[ -n "${PBS_O_WORKDIR:-}" && -f "${PBS_O_WORKDIR}/scripts/run_inference_experiments.py" ]]; then
+  REPO_ROOT="$(cd "${PBS_O_WORKDIR}" && pwd)"
+elif [[ -f "${PWD}/scripts/run_inference_experiments.py" ]]; then
+  REPO_ROOT="$(pwd)"
+else
+  REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
+if [[ ! -f "${REPO_ROOT}/scripts/run_inference_experiments.py" ]]; then
+  echo "Could not locate PtychoPINN repo root. Submit from the repo root or set PBS_O_WORKDIR correctly." >&2
+  echo "Resolved REPO_ROOT=${REPO_ROOT}" >&2
+  exit 1
+fi
 VENV_DIR="${VENV_DIR:-${REPO_ROOT}/../ptychopinn-venvs/aurora}"
 
 DATASETS=(TP1 TP2 IC1 IC2 NCM FLY1 LFP W LCLS)
@@ -14,9 +25,15 @@ DEVICES="${DEVICES:-0}"
 INTERVAL="${INTERVAL:-0.2}"
 WARMUP_SECONDS="${WARMUP_SECONDS:-0.5}"
 GPU_LABEL="${GPU_LABEL:-Max}"
-OUTPUT_ROOT="${OUTPUT_ROOT:-power_experiments}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-/home/john/power_experiments}"
 CONTINUE_ON_ERROR="${CONTINUE_ON_ERROR:-false}"
 TEST="${TEST:-false}"
+
+if [[ -z "${MEMMAP_ROOT:-}" ]]; then
+  LOCAL_TMP="${TMPDIR:-${PBS_TMPDIR:-/tmp}}"
+  MEMMAP_ROOT="${LOCAL_TMP%/}/ptychopinn_memmap_${PBS_JOBID:-$$}"
+fi
+export MEMMAP_ROOT
 
 if ! command -v module >/dev/null 2>&1; then
   if [[ -f /etc/profile.d/modules.sh ]]; then
@@ -44,6 +61,11 @@ source "${VENV_DIR}/bin/activate"
 
 export MLFLOW_ALLOW_FILE_STORE=true
 export ZE_AFFINITY_MASK="${DEVICES}"
+
+mkdir -p "${MEMMAP_ROOT}"
+echo "Using TensorDict memmap root: ${MEMMAP_ROOT}"
+mkdir -p "${OUTPUT_ROOT}"
+echo "Writing CSV/results output root: ${OUTPUT_ROOT}"
 
 python - <<'PY'
 import torch

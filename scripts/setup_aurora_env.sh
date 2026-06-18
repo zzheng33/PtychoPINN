@@ -2,7 +2,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+if [[ -n "${PBS_O_WORKDIR:-}" && -f "${PBS_O_WORKDIR}/requirements-aurora.txt" ]]; then
+  REPO_ROOT="$(cd "${PBS_O_WORKDIR}" && pwd)"
+elif [[ -f "${PWD}/requirements-aurora.txt" ]]; then
+  REPO_ROOT="$(pwd)"
+else
+  REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
+if [[ ! -f "${REPO_ROOT}/requirements-aurora.txt" ]]; then
+  echo "Could not locate PtychoPINN repo root. Run from the repo root or set PBS_O_WORKDIR correctly." >&2
+  echo "Resolved REPO_ROOT=${REPO_ROOT}" >&2
+  exit 1
+fi
 VENV_DIR="${VENV_DIR:-${REPO_ROOT}/../ptychopinn-venvs/aurora}"
 
 if ! command -v module >/dev/null 2>&1; then
