@@ -30,6 +30,76 @@ class AmplitudeActivation(nn.Module):
         return F.silu(x)
 
 
+class ChannelGate(nn.Module):
+    def __init__(self, gate_channels, reduction_ratio=16, pool_types=("avg", "max")):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(gate_channels, gate_channels // reduction_ratio),
+            nn.ReLU(),
+            nn.Linear(gate_channels // reduction_ratio, gate_channels),
+        )
+        self.pool_types = pool_types
+
+    def forward(self, x):
+        channel_att_sum = None
+        for pool_type in self.pool_types:
+            if pool_type == "avg":
+                pooled = F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+            elif pool_type == "max":
+                pooled = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+            else:
+                continue
+            raw = self.mlp(pooled)
+            channel_att_sum = raw if channel_att_sum is None else channel_att_sum + raw
+        scale = torch.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3).expand_as(x)
+        return x * scale
+
+
+class SpatialGate(nn.Module):
+    def __init__(self, kernel_size=7):
+        super().__init__()
+        padding = kernel_size // 2
+        self.compress = nn.Conv2d(2, 1, kernel_size=kernel_size, stride=1, padding=padding, bias=False)
+
+    def forward(self, x):
+        compressed = torch.cat((torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)), dim=1)
+        return x * torch.sigmoid(self.compress(compressed))
+
+
+class CBAM(nn.Module):
+    def __init__(self, gate_channels, reduction_ratio=16, pool_types=("avg", "max"), spatial_kernel_size=7):
+        super().__init__()
+        self.ChannelGate = ChannelGate(gate_channels, reduction_ratio, pool_types)
+        self.SpatialGate = SpatialGate(kernel_size=spatial_kernel_size)
+
+    def forward(self, x):
+        return self.SpatialGate(self.ChannelGate(x))
+
+
+class ECALayer(nn.Module):
+    def __init__(self, channel, k_size=3):
+        super().__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=(k_size - 1) // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        y = self.avg_pool(x)
+        y = self.conv(y.squeeze(-1).transpose(-1, -2))
+        y = y.transpose(-1, -2).unsqueeze(-1)
+        return x * self.sigmoid(y).expand_as(x)
+
+
+class BasicSpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super().__init__()
+        self.spatial_gate = SpatialGate(kernel_size=kernel_size)
+
+    def forward(self, x):
+        return self.spatial_gate(x)
+
+
 class ConvBaseBlock(nn.Module):
     def __init__(
         self,
@@ -64,15 +134,21 @@ class ConvBaseBlock(nn.Module):
 class ConvPoolBlock(ConvBaseBlock):
     def __init__(self, in_channels, out_channels, model_config, p1=2, p2=2, batch_norm=False):
         super().__init__(in_channels, out_channels, batch_norm=batch_norm)
-        if any(
-            getattr(model_config, name, False)
-            for name in ("cbam_encoder", "eca_encoder")
-        ):
-            raise ValueError("Cerebras smoke adapter does not include attention blocks.")
+        self.use_cbam = model_config.cbam_encoder
+        self.use_eca = model_config.eca_encoder
+        if self.use_cbam:
+            self.attention = CBAM(gate_channels=out_channels)
+        elif self.use_eca:
+            self.attention = ECALayer(out_channels)
+        else:
+            self.attention = nn.Identity()
         self.pool = nn.MaxPool2d(kernel_size=(p1, p2), padding=0)
 
     def forward(self, x):
-        return self.pool(super().forward(x))
+        x_new = super().forward(x)
+        if self.use_cbam:
+            x_new = self.attention(x_new)
+        return self.pool(x_new)
 
 
 class ConvUpBlock(ConvBaseBlock):
@@ -158,17 +234,27 @@ class DecoderFilters(nn.Module):
 class DecoderBase(DecoderFilters):
     def __init__(self, model_config, data_config, batch_norm=False):
         super().__init__(model_config, data_config)
-        if any(
-            getattr(model_config, name, False)
-            for name in ("cbam_decoder", "eca_decoder", "spatial_decoder")
-        ):
-            raise ValueError("Cerebras smoke adapter does not include attention blocks.")
+        self.use_cbam = model_config.cbam_decoder
+        self.use_eca = model_config.eca_decoder
+        self.use_spatial = model_config.spatial_decoder
+        self.spatial_kernel = model_config.decoder_spatial_kernel
         self.blocks = nn.ModuleList(
             [
                 ConvUpBlock(self.filters[i - 1], self.filters[i], batch_norm=batch_norm)
                 for i in range(1, len(self.filters))
             ]
         )
+        self.attention_blocks = nn.ModuleList()
+        for i in range(1, len(self.filters)):
+            out_ch = self.filters[i]
+            if self.use_eca:
+                self.attention_blocks.append(ECALayer(channel=out_ch))
+            elif self.use_spatial:
+                self.attention_blocks.append(BasicSpatialAttention(kernel_size=self.spatial_kernel))
+            elif self.use_cbam:
+                self.attention_blocks.append(CBAM(gate_channels=out_ch))
+            else:
+                self.attention_blocks.append(nn.Identity())
 
 
 class DecoderLast(nn.Module):
@@ -245,10 +331,11 @@ class DecoderAmp(DecoderBase):
 class Autoencoder(nn.Module):
     def __init__(self, model_config, data_config):
         super().__init__()
-        if getattr(model_config, "cbam_bottleneck", False):
-            raise ValueError("Cerebras smoke adapter does not include attention blocks.")
         self.encoder = Encoder(model_config, data_config)
-        self.bottleneck_cbam = nn.Identity()
+        if getattr(model_config, "cbam_bottleneck", False):
+            self.bottleneck_cbam = CBAM(gate_channels=self.encoder.filters[-1])
+        else:
+            self.bottleneck_cbam = nn.Identity()
         self.decoder_amp = DecoderAmp(model_config, data_config)
         self.decoder_phase = DecoderPhase(model_config, data_config)
 
