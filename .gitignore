@@ -13,6 +13,9 @@ manuscript_figures
 mlruns
 mlruns_raw
 data
+modeling_exp/synthetic_inputs/
+modeling_exp/**/_memmap/
+modeling_exp/**/_memmap_state_files.npz
 **/_memmap/
 **/_memmap_state_files.npz
 ptychopinn_torch/configs/*

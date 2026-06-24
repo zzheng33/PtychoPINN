@@ -103,6 +103,9 @@ def append_summary(path: Path, row: dict[str, object]) -> None:
 
 
 def detect_gpu_label(args) -> tuple[str, str]:
+    if args.device == "cpu":
+        return "cpu", safe_name(args.gpu_label or "CPU")
+
     if args.gpu_label:
         vendor = args.vendor if args.vendor != "auto" else "unknown_vendor"
         return vendor, safe_name(args.gpu_label)
@@ -186,8 +189,10 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
         inference_cmd.extend(["--config", args.config])
 
     monitor = None
-    if args.test:
-        print("Test mode: skipping GPU power monitor and CSV output.", flush=True)
+    monitor_power = not args.test and args.device != "cpu"
+    if not monitor_power:
+        reason = "CPU device" if args.device == "cpu" else "test mode"
+        print(f"{reason}: skipping GPU power monitor and CSV output.", flush=True)
     else:
         preflight_csv = dataset_dir / f"bs{batch_size}_power_preflight.csv"
         preflight_cmd = monitor_cmd.copy()
@@ -250,7 +255,7 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
         "devices": args.devices or "all",
         "returncode": completed.returncode if completed is not None else 1,
         "duration_s": f"{end - start:.6f}",
-        "power_csv": "" if args.test else str(power_csv),
+        "power_csv": str(power_csv) if monitor_power else "",
         "output_dir": str(output_dir),
         "log_file": str(log_file),
     }

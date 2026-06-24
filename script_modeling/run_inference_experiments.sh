@@ -5,14 +5,28 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 
-# Edit these defaults for your experiment sweep.
-DATASETS=(TP1 TP2 IC1 IC2 NCM FLY1 LFP W LCLS)
-DATASETS=(TP2)
-BATCH_SIZES=(32 64 128 256 512 1024)
+# Defaults for modeling experiments. Generate these first with:
+#   ./script_modeling/create_synthetic_inference_sweep.sh
+DATASETS=(
+  modeling_exp/synthetic_inputs/R1000
+  modeling_exp/synthetic_inputs/R2000
+  modeling_exp/synthetic_inputs/R4000
+  modeling_exp/synthetic_inputs/R8000
+  modeling_exp/synthetic_inputs/R12000
+  modeling_exp/synthetic_inputs/R16000
+  modeling_exp/synthetic_inputs/R20000
+  modeling_exp/synthetic_inputs/R26000
+)
 BATCH_SIZES=(1024)
 DEVICE="${DEVICE:-cuda}"
 VENDOR="${VENDOR:-auto}"
-DEVICES="${DEVICES:-0}"
+if [[ -z "${DEVICES+x}" ]]; then
+  if [[ "${DEVICE}" == "cpu" ]]; then
+    DEVICES=""
+  else
+    DEVICES="0"
+  fi
+fi
 INTERVAL="${INTERVAL:-0.2}"
 WARMUP_SECONDS="${WARMUP_SECONDS:-0.5}"
 CONDA_ENV="${CONDA_ENV:-ptychopinn_torch}"
@@ -23,6 +37,8 @@ SUMMARY_CSV="${SUMMARY_CSV:-${OUTPUT_ROOT}/inference_summary.csv}"
 CONTINUE_ON_ERROR="${CONTINUE_ON_ERROR:-false}"
 TEST="${TEST:-false}"
 CONDA_BASE="${CONDA_BASE:-${HOME}/miniforge3}"
+PROFILE_DATASET="${PROFILE_DATASET:-true}"
+MODEL_KEY="${MODEL_KEY:-PS_W}"
 
 cd "${REPO_ROOT}"
 
@@ -55,15 +71,13 @@ fi
 
 if ! "${PYTHON_BIN}" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 8) else 1)' >/dev/null 2>&1; then
   echo "Python executable is not usable or is too old: ${PYTHON_BIN}" >&2
-  echo "On Grace/ARM systems, use a Python/env built for that machine." >&2
-  echo "Example: PYTHON_BIN=/path/to/arm/env/bin/python ./scripts/run_inference_experiments.sh" >&2
   exit 1
 fi
 
 echo "Using Python: ${PYTHON_BIN}"
 
 CMD=(
-  "${PYTHON_BIN}" scripts/run_inference_experiments.py
+  "${PYTHON_BIN}" script_modeling/run_inference_experiments.py
   --datasets "${DATASETS[@]}"
   --batch-sizes "${BATCH_SIZES[@]}"
   --device "${DEVICE}"
@@ -73,7 +87,12 @@ CMD=(
   --conda-env "${CONDA_ENV}"
   --output-root "${OUTPUT_ROOT}"
   --summary-csv "${SUMMARY_CSV}"
+  --model-key "${MODEL_KEY}"
 )
+
+if [[ "${PROFILE_DATASET}" == "true" ]]; then
+  CMD+=(--profile-dataset)
+fi
 
 if [[ -n "${DEVICES}" ]]; then
   CMD+=(--devices "${DEVICES}")
