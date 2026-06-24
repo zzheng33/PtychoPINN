@@ -17,64 +17,64 @@ Starting matched power monitor: /home/zhong.zheng/PtychoPINN/modeling_exp/MI300X
 Loading model...
 
 Downloading artifacts:   0%|          | 0/6 [00:00<?, ?it/s]
-Downloading artifacts:  17%|█▋        | 1/6 [00:00<00:00, 23831.27it/s]
-Downloading artifacts:  33%|███▎      | 2/6 [00:00<00:00, 19972.88it/s]
-Downloading artifacts:  50%|█████     | 3/6 [00:00<00:00, 8411.04it/s] 
-Downloading artifacts:  67%|██████▋   | 4/6 [00:00<00:00, 10016.25it/s]
-Downloading artifacts:  83%|████████▎ | 5/6 [00:00<00:00, 9896.89it/s] 
-Downloading artifacts: 100%|██████████| 6/6 [00:00<00:00, 2624.99it/s]
-Downloading artifacts: 100%|██████████| 6/6 [00:00<00:00, 2562.45it/s]
-2026/06/24 19:27:37 WARNING mlflow.pytorch: Stored model version '2.5.1' does not match installed PyTorch version '2.9.1+rocm6.3'
+Downloading artifacts:  17%|█▋        | 1/6 [00:00<00:00, 18315.74it/s]
+Downloading artifacts:  33%|███▎      | 2/6 [00:00<00:00, 18436.50it/s]
+Downloading artifacts:  50%|█████     | 3/6 [00:00<00:00, 12216.42it/s]
+Downloading artifacts:  67%|██████▋   | 4/6 [00:00<00:00, 10427.11it/s]
+Downloading artifacts:  83%|████████▎ | 5/6 [00:00<00:00, 11997.44it/s]
+Downloading artifacts: 100%|██████████| 6/6 [00:00<00:00, 3445.49it/s] 
+Downloading artifacts: 100%|██████████| 6/6 [00:00<00:00, 3346.52it/s]
+2026/06/24 20:24:29 WARNING mlflow.pytorch: Stored model version '2.5.1' does not match installed PyTorch version '2.9.1+rocm6.3'
 Model loaded. Beginning dataloader prep...
-[PtychoDataset profile] __init__ setup: 0.000144 s
-[PtychoDataset profile] file listing: 0.000624 s
+[PtychoDataset profile] __init__ setup: 0.000151 s
+[PtychoDataset profile] file listing: 0.000445 s
 Calculating dataset length with coordinate bounds...
-[PtychoDataset profile] calculate_length file synthetic_1000_N64.npz npz_headers: 0.001036 s
+[PtychoDataset profile] calculate_length file synthetic_1000_N64.npz npz_headers: 0.000957 s
 For file synthetic_inputs/R1000/synthetic_1000_N64.npz, maximum x_range is (np.float64(32.0), np.float64(94.0)), yrange is (np.float64(32.0), np.float64(94.0))
-[PtychoDataset profile] calculate_length file synthetic_1000_N64.npz total: 0.001119 s
-[PtychoDataset profile] calculate_length total: 0.001129 s
-[PtychoDataset profile] calculate_length: 0.001139 s
+[PtychoDataset profile] calculate_length file synthetic_1000_N64.npz total: 0.001035 s
+[PtychoDataset profile] calculate_length total: 0.001046 s
+[PtychoDataset profile] calculate_length: 0.001053 s
 [PtychoDataset profile] map existence check: 0.000035 s
-[PtychoDataset profile] map directory setup: 0.000017 s
+[PtychoDataset profile] map directory setup: 0.000015 s
 Creating memory mapped tensor dictionary...
 Memory map length: 784
-Memory map creation time: 0.0008873939514160156
-[PtychoDataset profile] memory_map_data memmap_like: 0.000944 s
+Memory map creation time: 0.0008797645568847656
+[PtychoDataset profile] memory_map_data memmap_like: 0.000942 s
 Populating memory map for dataset 0
 Estimated rows for dataset: 784
-[PtychoDataset profile] memory_map_data dataset 0 load/filter coords: 0.000857 s
+[PtychoDataset profile] memory_map_data dataset 0 load/filter coords: 0.000771 s
 Building KDTree for 1000 points...
 Processing 784 potential central points...
 Finished quadrant neighbor processing. Found 784 valid C=4 groups.
-[PtychoDataset profile] memory_map_data dataset 0 group coords: 0.051582 s
+[PtychoDataset profile] memory_map_data dataset 0 group coords: 0.051847 s
 Actual grouped rows for dataset: 784
-[PtychoDataset profile] memory_map_data dataset 0 write grouped coord tensors: 0.005113 s
-[PtychoDataset profile] memory_map_data dataset 0 write experiment ids: 0.000057 s
-[PtychoDataset profile] memory_map_data dataset 0 load/store probe: 0.001103 s
-[PtychoDataset profile] memory_map_data dataset 0 load/store object: 0.000730 s
-Non-diffraction memory map write time: 0.05958271026611328
-[PtychoDataset profile] memory_map_data dataset 0 load diff3d: 0.029634 s
+[PtychoDataset profile] memory_map_data dataset 0 write grouped coord tensors: 0.005000 s
+[PtychoDataset profile] memory_map_data dataset 0 write experiment ids: 0.000059 s
+[PtychoDataset profile] memory_map_data dataset 0 load/store probe: 0.000755 s
+[PtychoDataset profile] memory_map_data dataset 0 load/store object: 0.000726 s
+Non-diffraction memory map write time: 0.059303998947143555
+[PtychoDataset profile] memory_map_data dataset 0 load diff3d: 0.039509 s
 Getting normalization coefficients...
 Batch rms factor is tensor([[[[0.0488]]]])
-[PtychoDataset profile] memory_map_data dataset 0 normalization constants: 0.003339 s
-[PtychoDataset profile] memory_map_data dataset 0 write image tensors: 0.027770 s
-Diffraction memory map write time: 0.06091165542602539
-[PtychoDataset profile] memory_map_data dataset 0 total: 0.120510 s
-[PtychoDataset profile] memory_map_data total: 0.122398 s
-[PtychoDataset profile] memory_map_data: 0.122455 s
-[PtychoDataset profile] save state file: 0.000926 s
-[PtychoDataset profile] TensorDict.load_memmap: 0.004056 s
-[PtychoDataset profile] load state file: 0.000924 s
+[PtychoDataset profile] memory_map_data dataset 0 normalization constants: 0.003690 s
+[PtychoDataset profile] memory_map_data dataset 0 write image tensors: 0.025711 s
+Diffraction memory map write time: 0.06903505325317383
+[PtychoDataset profile] memory_map_data dataset 0 total: 0.128351 s
+[PtychoDataset profile] memory_map_data total: 0.130227 s
+[PtychoDataset profile] memory_map_data: 0.130285 s
+[PtychoDataset profile] save state file: 0.000925 s
+[PtychoDataset profile] TensorDict.load_memmap: 0.003051 s
+[PtychoDataset profile] load state file: 0.000998 s
 [PtychoDataset Rank 0] Initialization successful. Dataset length: 784.
-[PtychoDataset profile] __init__ total: 0.130480 s
+[PtychoDataset profile] __init__ total: 0.137138 s
 Dataloader finished.
 Data config: DataConfig(nphotons=100000.0, N=64, C=4, K=6, K_quadrant=60, n_subsample=1, grid_size=[2, 2], neighbor_function='4_quadrant', min_neighbor_distance=0.5, max_neighbor_distance=8, scan_pattern='Rectangular', normalize='Batch', probe_scale=1.0, probe_normalize=True, data_scaling='Parseval', phase_subtraction=True, x_bounds=[0.05, 0.95], y_bounds=[0.05, 0.95], x_neighbor_bounds=(0.0, 12.0), y_neighbor_bounds=(0.7, 2.0))
 Model config: ModelConfig(mode='Unsupervised', intensity_scale_trainable=False, intensity_scale=10000.0, max_position_jitter=10, C_model=4, n_filters_scale=2, amp_activation='silu', batch_norm=False, probe_mask=None, edge_pad=10, decoder_last_c_outer_fraction=0.125, decoder_last_amp_channels=4, eca_encoder=False, cbam_encoder=True, cbam_bottleneck=False, cbam_decoder=False, eca_decoder=False, spatial_decoder=False, decoder_spatial_kernel=7, object_big=True, probe_big=True, offset=6, C_forward=4, loss_function='Poisson', amp_loss=None, phase_loss=None, amp_loss_coeff=4.0, phase_loss_coeff=1.0)
 Inference config: InferenceConfig(middle_trim=32, batch_size=1024, experiment_number=0, pad_eval=True, window=20)
-Model load time: 1.0406546592712402 
- Data load time: 0.13049960136413574
-Total inference time: 3.328923225402832
-Total assembly time: 0.02779245376586914
+Model load time: 1.011376142501831 
+ Data load time: 0.13717389106750488
+Total inference time: 0.5779778957366943
+Total assembly time: 0.05004382133483887
 Latency-only mode: skipped plot and reconstruction save.
 Deleted memmap cache: /tmp/ptychopinn_memmaps/MI300X/synthetic_inputs_R1000/_memmap
 Deleted memmap state: /tmp/ptychopinn_memmaps/MI300X/synthetic_inputs_R1000/_memmap_state_files.npz
