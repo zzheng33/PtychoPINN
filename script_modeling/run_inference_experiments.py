@@ -22,6 +22,11 @@ def safe_name(value: str) -> str:
     return "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in value)
 
 
+def dataset_output_name(dataset: str) -> str:
+    path_name = Path(dataset).name
+    return safe_name(path_name or dataset)
+
+
 def short_gpu_name(name: str) -> str:
     normalized = name.upper().replace("_", " ").replace("-", " ")
     known_names = (
@@ -134,8 +139,9 @@ def detect_gpu_label(args) -> tuple[str, str]:
 
 
 def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, object]:
-    label = f"{dataset}_bs{batch_size}"
-    dataset_dir = run_dir / safe_name(dataset)
+    output_name = dataset_output_name(dataset)
+    label = f"{output_name}_bs{batch_size}"
+    dataset_dir = run_dir / output_name
     dataset_dir.mkdir(parents=True, exist_ok=True)
     power_csv = dataset_dir / f"bs{batch_size}_power.csv"
     output_dir = dataset_dir / f"bs{batch_size}_outputs"
@@ -144,24 +150,6 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
         memmap_dir = args.memmap_root / safe_name(args.gpu_label) / safe_name(dataset) / "_memmap"
     else:
         memmap_dir = dataset_dir / "_memmap"
-
-    monitor_cmd = [
-        sys.executable,
-        str(MONITOR_SCRIPT),
-        "--vendor",
-        args.vendor,
-        "--interval",
-        str(args.interval),
-        "--output",
-        str(power_csv),
-        "--label",
-        label,
-    ]
-    if args.devices:
-        monitor_cmd.extend(["--devices", args.devices])
-
-    monitor_env = os.environ.copy()
-    monitor_env.pop("ZE_AFFINITY_MASK", None)
 
     inference_cmd = [
         sys.executable,
@@ -176,6 +164,7 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
         str(output_dir),
         "--memmap-dir",
         str(memmap_dir),
+        "--skip-save",
     ]
     if args.remake_map:
         inference_cmd.append("--remake-map")
@@ -188,22 +177,25 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
     if args.config:
         inference_cmd.extend(["--config", args.config])
 
-    monitor = None
     monitor_power = not args.test and args.device != "cpu"
     if not monitor_power:
         reason = "CPU device" if args.device == "cpu" else "test mode"
         print(f"{reason}: skipping GPU power monitor and CSV output.", flush=True)
     else:
-        preflight_csv = dataset_dir / f"bs{batch_size}_power_preflight.csv"
-        preflight_cmd = monitor_cmd.copy()
-        output_index = preflight_cmd.index("--output") + 1
-        preflight_cmd[output_index] = str(preflight_csv)
-        preflight_cmd.append("--once")
-        print(f"Power monitor preflight: {preflight_csv}", flush=True)
-        subprocess.run(preflight_cmd, cwd=REPO_ROOT, env=monitor_env, check=False)
-        print(f"Starting monitor: {power_csv}", flush=True)
-        monitor = subprocess.Popen(monitor_cmd, cwd=REPO_ROOT, env=monitor_env)
-        time.sleep(args.warmup_seconds)
+        inference_cmd.extend(
+            [
+                "--power-output",
+                str(power_csv),
+                "--power-vendor",
+                args.vendor,
+                "--power-interval",
+                str(args.interval),
+                "--power-label",
+                label,
+            ]
+        )
+        if args.devices:
+            inference_cmd.extend(["--power-devices", args.devices])
 
     completed = None
     env = os.environ.copy()
@@ -216,33 +208,24 @@ def run_one(args, dataset: str, batch_size: int, run_dir: Path) -> dict[str, obj
         env["ROCR_VISIBLE_DEVICES"] = args.devices
         env["GPU_DEVICE_ORDINAL"] = args.devices
         env["ZE_AFFINITY_MASK"] = args.devices
-    try:
-        print(f"Running inference: dataset={dataset}, batch_size={batch_size}", flush=True)
-        start = time.time()
-        with log_file.open("w", encoding="utf-8") as log_handle:
-            process = subprocess.Popen(
-                inference_cmd,
-                cwd=REPO_ROOT,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-            )
-            assert process.stdout is not None
-            for line in process.stdout:
-                print(line, end="")
-                log_handle.write(line)
-            returncode = process.wait()
-        completed = subprocess.CompletedProcess(inference_cmd, returncode)
-    finally:
-        if monitor is not None:
-            monitor.terminate()
-            try:
-                monitor.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                monitor.kill()
-                monitor.wait()
+    print(f"Running inference: dataset={dataset}, batch_size={batch_size}", flush=True)
+    start = time.time()
+    with log_file.open("w", encoding="utf-8") as log_handle:
+        process = subprocess.Popen(
+            inference_cmd,
+            cwd=REPO_ROOT,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        assert process.stdout is not None
+        for line in process.stdout:
+            print(line, end="")
+            log_handle.write(line)
+        returncode = process.wait()
+    completed = subprocess.CompletedProcess(inference_cmd, returncode)
 
     end = time.time()
     row = {
@@ -277,11 +260,16 @@ def main() -> int:
     parser.add_argument("--vendor", default="auto", choices=("auto", "nvidia", "amd", "intel"))
     parser.add_argument("--devices", default=None, help="Comma-separated GPU indices to monitor.")
     parser.add_argument("--interval", type=float, default=0.2)
-    parser.add_argument("--warmup-seconds", type=float, default=0.5)
     parser.add_argument("--conda-env", default="ptychopinn_torch", help="Kept for wrapper compatibility.")
     parser.add_argument("--model-key", default=None)
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--config", default=None)
+    parser.add_argument(
+        "--repeats",
+        type=int,
+        default=1,
+        help="Run each dataset/batch-size pair this many consecutive times. Later runs overwrite the same log/power outputs.",
+    )
     parser.add_argument("--output-root", type=Path, default=REPO_ROOT / "modeling_exp")
     parser.add_argument("--summary-csv", type=Path, default=None)
     parser.add_argument(
@@ -319,10 +307,10 @@ def main() -> int:
         help="Force recreation of the dataset-level _memmap cache before each run.",
     )
     args = parser.parse_args()
+    if args.repeats < 1:
+        raise ValueError("--repeats must be >= 1")
     if args.keep_memmap:
         args.cleanup_memmap = False
-    if args.summary_csv is None:
-        args.summary_csv = args.output_root / "inference_summary.csv"
 
     detected_vendor, gpu_label = detect_gpu_label(args)
     args.detected_vendor = detected_vendor
@@ -332,10 +320,16 @@ def main() -> int:
 
     for dataset in args.datasets:
         for batch_size in args.batch_sizes:
-            row = run_one(args, dataset, batch_size, run_dir)
-            if row["returncode"] != 0 and not args.continue_on_error:
-                print(f"Stopping after failed run: {row}", file=sys.stderr)
-                return int(row["returncode"])
+            for repeat_index in range(1, args.repeats + 1):
+                if args.repeats > 1:
+                    print(
+                        f"Repeat {repeat_index}/{args.repeats}: dataset={dataset}, batch_size={batch_size}",
+                        flush=True,
+                    )
+                row = run_one(args, dataset, batch_size, run_dir)
+                if row["returncode"] != 0 and not args.continue_on_error:
+                    print(f"Stopping after failed run: {row}", file=sys.stderr)
+                    return int(row["returncode"])
 
     return 0
 

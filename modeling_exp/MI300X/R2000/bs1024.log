@@ -1,0 +1,81 @@
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+torch visible CUDA GPUs: 1
+torch current CUDA GPU:  0 (AMD Radeon Graphics)
+dataset:   synthetic_inputs/R2000 -> synthetic_inputs/R2000
+model:     PS_W
+run_id:    74ba23396c4042afb1751afe9fa87520
+device:    cuda
+output:    /home/zhong.zheng/PtychoPINN/modeling_exp/MI300X/R2000/bs1024_outputs/synthetic_inputs/R2000_PS_W_recon.npz
+Starting matched power monitor: /home/zhong.zheng/PtychoPINN/modeling_exp/MI300X/R2000/bs1024_power.csv
+Loading model...
+
+Downloading artifacts:   0%|          | 0/6 [00:00<?, ?it/s]
+Downloading artifacts:  17%|█▋        | 1/6 [00:00<00:00, 23301.69it/s]
+Downloading artifacts:  33%|███▎      | 2/6 [00:00<00:00, 21399.51it/s]
+Downloading artifacts:  50%|█████     | 3/6 [00:00<00:00, 23967.45it/s]
+Downloading artifacts:  67%|██████▋   | 4/6 [00:00<00:00, 26092.09it/s]
+Downloading artifacts:  83%|████████▎ | 5/6 [00:00<00:00, 21687.20it/s]
+Downloading artifacts: 100%|██████████| 6/6 [00:00<00:00, 2354.15it/s] 
+Downloading artifacts: 100%|██████████| 6/6 [00:00<00:00, 2309.85it/s]
+2026/06/24 19:28:22 WARNING mlflow.pytorch: Stored model version '2.5.1' does not match installed PyTorch version '2.9.1+rocm6.3'
+Model loaded. Beginning dataloader prep...
+[PtychoDataset profile] __init__ setup: 0.000182 s
+[PtychoDataset profile] file listing: 0.000605 s
+Calculating dataset length with coordinate bounds...
+[PtychoDataset profile] calculate_length file synthetic_2000_N64.npz npz_headers: 0.001116 s
+For file synthetic_inputs/R2000/synthetic_2000_N64.npz, maximum x_range is (np.float64(32.0), np.float64(120.0)), yrange is (np.float64(32.0), np.float64(120.0))
+[PtychoDataset profile] calculate_length file synthetic_2000_N64.npz total: 0.001220 s
+[PtychoDataset profile] calculate_length total: 0.001230 s
+[PtychoDataset profile] calculate_length: 0.001236 s
+[PtychoDataset profile] map existence check: 0.000034 s
+[PtychoDataset profile] map directory setup: 0.000016 s
+Creating memory mapped tensor dictionary...
+Memory map length: 1521
+Memory map creation time: 0.0009570121765136719
+[PtychoDataset profile] memory_map_data memmap_like: 0.000954 s
+Populating memory map for dataset 0
+Estimated rows for dataset: 1521
+[PtychoDataset profile] memory_map_data dataset 0 load/filter coords: 0.000790 s
+Building KDTree for 2000 points...
+Processing 1521 potential central points...
+Finished quadrant neighbor processing. Found 1521 valid C=4 groups.
+[PtychoDataset profile] memory_map_data dataset 0 group coords: 0.103680 s
+Actual grouped rows for dataset: 1521
+[PtychoDataset profile] memory_map_data dataset 0 write grouped coord tensors: 0.005696 s
+[PtychoDataset profile] memory_map_data dataset 0 write experiment ids: 0.000066 s
+[PtychoDataset profile] memory_map_data dataset 0 load/store probe: 0.000852 s
+[PtychoDataset profile] memory_map_data dataset 0 load/store object: 0.000707 s
+Non-diffraction memory map write time: 0.11193561553955078
+[PtychoDataset profile] memory_map_data dataset 0 load diff3d: 0.071547 s
+Getting normalization coefficients...
+Batch rms factor is tensor([[[[0.0488]]]])
+[PtychoDataset profile] memory_map_data dataset 0 normalization constants: 0.003224 s
+[PtychoDataset profile] memory_map_data dataset 0 write image tensors: 0.047719 s
+Diffraction memory map write time: 0.12265276908874512
+[PtychoDataset profile] memory_map_data dataset 0 total: 0.234602 s
+[PtychoDataset profile] memory_map_data total: 0.236573 s
+[PtychoDataset profile] memory_map_data: 0.236859 s
+[PtychoDataset profile] save state file: 0.001326 s
+[PtychoDataset profile] TensorDict.load_memmap: 0.004620 s
+[PtychoDataset profile] load state file: 0.001069 s
+[PtychoDataset Rank 0] Initialization successful. Dataset length: 1521.
+[PtychoDataset profile] __init__ total: 0.246086 s
+Params set by AI: DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 128, 64, OddC, 32, 32, 2, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3>
+Dataloader finished.
+Data config: DataConfig(nphotons=100000.0, N=64, C=4, K=6, K_quadrant=60, n_subsample=1, grid_size=[2, 2], neighbor_function='4_quadrant', min_neighbor_distance=0.5, max_neighbor_distance=8, scan_pattern='Rectangular', normalize='Batch', probe_scale=1.0, probe_normalize=True, data_scaling='Parseval', phase_subtraction=True, x_bounds=[0.05, 0.95], y_bounds=[0.05, 0.95], x_neighbor_bounds=(0.0, 12.0), y_neighbor_bounds=(0.7, 2.0))
+Model config: ModelConfig(mode='Unsupervised', intensity_scale_trainable=False, intensity_scale=10000.0, max_position_jitter=10, C_model=4, n_filters_scale=2, amp_activation='silu', batch_norm=False, probe_mask=None, edge_pad=10, decoder_last_c_outer_fraction=0.125, decoder_last_amp_channels=4, eca_encoder=False, cbam_encoder=True, cbam_bottleneck=False, cbam_decoder=False, eca_decoder=False, spatial_decoder=False, decoder_spatial_kernel=7, object_big=True, probe_big=True, offset=6, C_forward=4, loss_function='Poisson', amp_loss=None, phase_loss=None, amp_loss_coeff=4.0, phase_loss_coeff=1.0)
+Inference config: InferenceConfig(middle_trim=32, batch_size=1024, experiment_number=0, pad_eval=True, window=20)
+Model load time: 1.2939190864562988 
+ Data load time: 0.2461080551147461
+Total inference time: 0.6307778358459473
+Total assembly time: 0.037106990814208984
+Latency-only mode: skipped plot and reconstruction save.
+Deleted memmap cache: /tmp/ptychopinn_memmaps/MI300X/synthetic_inputs_R2000/_memmap
+Deleted memmap state: /tmp/ptychopinn_memmaps/MI300X/synthetic_inputs_R2000/_memmap_state_files.npz

@@ -6,8 +6,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 export DEVICE="${DEVICE:-cuda}"
 export VENDOR="${VENDOR:-amd}"
-export CONDA_ENV="${CONDA_ENV:-ptychopinn_torch_rocm}"
-export GPU_LABEL="${GPU_LABEL:-MI300A}"
+export CONDA_ENV="${CONDA_ENV:-ptychi_rocm}"
+export GPU_LABEL="${GPU_LABEL:-MI300X}"
 export OUTPUT_ROOT="${OUTPUT_ROOT:-${REPO_ROOT}/modeling_exp}"
 
 MODULE_PATH="${MODULE_PATH:-/soft/modulefiles}"

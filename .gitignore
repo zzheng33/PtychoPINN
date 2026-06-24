@@ -13,6 +13,7 @@ manuscript_figures
 mlruns
 mlruns_raw
 data
+synthetic_inputs/
 modeling_exp/synthetic_inputs/
 modeling_exp/**/_memmap/
 modeling_exp/**/_memmap_state_files.npz

@@ -5,6 +5,7 @@ from datetime import datetime
 import argparse
 import sys
 from pathlib import Path
+import subprocess
 
 #ML libraries
 import mlflow
@@ -20,6 +21,44 @@ from ptychopinn_torch.config_params import update_existing_config
 from ptychopinn_torch.config_params import DataConfig, ModelConfig, TrainingConfig, InferenceConfig, DatagenConfig
 from ptychopinn_torch.utils import load_config_from_json, validate_and_process_config, remove_all_files
 from ptychopinn_torch.dataloader import PtychoDataset
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MONITOR_SCRIPT = REPO_ROOT / "scripts" / "monitor_gpu_power.py"
+
+
+def start_power_monitor(power_output, power_vendor, power_devices, power_interval, power_label):
+    if power_output is None:
+        return None
+    cmd = [
+        sys.executable,
+        str(MONITOR_SCRIPT),
+        "--vendor",
+        power_vendor,
+        "--interval",
+        str(power_interval),
+        "--output",
+        str(power_output),
+        "--label",
+        power_label,
+    ]
+    if power_devices:
+        cmd.extend(["--devices", power_devices])
+
+    env = os.environ.copy()
+    env.pop("ZE_AFFINITY_MASK", None)
+    print(f"Starting matched power monitor: {power_output}", flush=True)
+    return subprocess.Popen(cmd, cwd=REPO_ROOT, env=env)
+
+
+def stop_power_monitor(monitor):
+    if monitor is None:
+        return
+    monitor.terminate()
+    try:
+        monitor.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        monitor.kill()
+        monitor.wait()
 
 def load_all_configs(config_path, file_index):
     """
@@ -79,7 +118,13 @@ def load_and_predict(run_id,
 	                     device = None,
 	                     batch_size = None,
 	                     data_dir = None,
-	                     remake_map = False):
+	                     remake_map = False,
+	                     save_outputs = True,
+	                     power_output = None,
+	                     power_vendor = "auto",
+	                     power_devices = None,
+	                     power_interval = 0.2,
+	                     power_label = ""):
     '''
     Given MLFlow run id, as well as ptycho file directory, will provide predictions 
     Args:
@@ -119,62 +164,65 @@ def load_and_predict(run_id,
         device = "cpu"
     training_config.device = device
 
-    #Loading model
-    print("Loading model...")
-    model_load_start = time.time()
+    monitor = start_power_monitor(power_output, power_vendor, power_devices, power_interval, power_label)
     try:
-        loaded_model = mlflow.pytorch.load_model(model_uri, map_location=torch.device(device))
-    except Exception as exc:
-        local_model_path = resolve_local_mlflow_model_path(run_id, relative_mlflow_path)
-        if local_model_path is None:
-            raise
-        print(f"MLflow runs URI failed ({exc}); loading local model artifact: {local_model_path}")
-        loaded_model = mlflow.pytorch.load_model(str(local_model_path), map_location=torch.device(device))
-    loaded_model.to(training_config.device)
-    loaded_model.training = True
-    model_load_time = time.time() - model_load_start
-    print("Model loaded. Beginning dataloader prep...")
+    #Loading model
+        print("Loading model...")
+        model_load_start = time.time()
+        try:
+            loaded_model = mlflow.pytorch.load_model(model_uri, map_location=torch.device(device))
+        except Exception as exc:
+            local_model_path = resolve_local_mlflow_model_path(run_id, relative_mlflow_path)
+            if local_model_path is None:
+                raise
+            print(f"MLflow runs URI failed ({exc}); loading local model artifact: {local_model_path}")
+            loaded_model = mlflow.pytorch.load_model(str(local_model_path), map_location=torch.device(device))
+        loaded_model.to(training_config.device)
+        loaded_model.training = True
+        model_load_time = time.time() - model_load_start
+        print("Model loaded. Beginning dataloader prep...")
 
     #Load data into dataset structure
-    data_load_start = time.time()
-    if data_dir is None:
-        data_dir = os.path.join(os.path.dirname(os.path.abspath(save_dir)), "_memmap")
-    ptycho_dataset = PtychoDataset(ptycho_files_dir, model_config, data_config,
-	                                data_dir=data_dir, remake_map=remake_map)
-    
-    data_load_time = time.time() - data_load_start
+        data_load_start = time.time()
+        if data_dir is None:
+            data_dir = os.path.join(os.path.dirname(os.path.abspath(save_dir)), "_memmap")
+        ptycho_dataset = PtychoDataset(ptycho_files_dir, model_config, data_config,
+	                                    data_dir=data_dir, remake_map=remake_map)
 
-    print("Dataloader finished.")
-    
+        data_load_time = time.time() - data_load_start
+
+        print("Dataloader finished.")
+
     #Reconstructing. Automatically puts dataset into dataloader, so don't worry about it
-    if verbose:
-        print(f"Data config: {data_config}")
-        print(f"Model config: {model_config}")
-        print(f"Inference config: {inference_config}")
-    result, recon_dataset, assembly_stats = reconstruct_image_barycentric(loaded_model, ptycho_dataset,
-                           training_config, data_config, model_config, inference_config, gpu_ids = None,
-                           use_mixed_precision=True, verbose = False)
+        if verbose:
+            print(f"Data config: {data_config}")
+            print(f"Model config: {model_config}")
+            print(f"Inference config: {inference_config}")
+        result, recon_dataset, assembly_stats = reconstruct_image_barycentric(loaded_model, ptycho_dataset,
+                               training_config, data_config, model_config, inference_config, gpu_ids = None,
+                               use_mixed_precision=True, verbose = False)
 
-    
-    #Save results
-    result_im = result.to('cpu')
-    if len(result_im.shape) == 3:
-        result_im = result_im[0].squeeze()
-    
-    w = inference_config.window
-    result_amp = np.abs(result_im)
-    result_phase = np.angle(result_im) 
-    gt_amp = np.abs(recon_dataset.data_dict['objectGuess']).squeeze()
-    gt_phase = np.angle(recon_dataset.data_dict['objectGuess']).squeeze()
+        if save_outputs:
+            result_im = result.to('cpu')
+            if len(result_im.shape) == 3:
+                result_im = result_im[0].squeeze()
 
-    plot_amp_and_phase(result_amp[w:-w,w:-w], result_phase[w:-w,w:-w],
-                       gt_amp[w:-w,w:-w], gt_phase[w:-w,w:-w],
-                       save_dir = save_dir, filename = plot_name)
+            w = inference_config.window
+            result_amp = np.abs(result_im)
+            result_phase = np.angle(result_im)
+            gt_amp = np.abs(recon_dataset.data_dict['objectGuess']).squeeze()
+            gt_phase = np.angle(recon_dataset.data_dict['objectGuess']).squeeze()
 
-    print(f"Model load time: {model_load_time} \n "
-          f"Data load time: {data_load_time}\n"
-          f"Total inference time: {assembly_stats[0]}\n"
-          f"Total assembly time: {assembly_stats[1]}")
+            plot_amp_and_phase(result_amp[w:-w,w:-w], result_phase[w:-w,w:-w],
+                               gt_amp[w:-w,w:-w], gt_phase[w:-w,w:-w],
+                               save_dir = save_dir, filename = plot_name)
+
+        print(f"Model load time: {model_load_time} \n "
+              f"Data load time: {data_load_time}\n"
+              f"Total inference time: {assembly_stats[0]}\n"
+              f"Total assembly time: {assembly_stats[1]}")
+    finally:
+        stop_power_monitor(monitor)
     
     return result
 

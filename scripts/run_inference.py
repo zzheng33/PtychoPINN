@@ -162,6 +162,16 @@ def main() -> None:
         help="Delete the generated _memmap cache after saving inference outputs.",
     )
     parser.add_argument(
+        "--skip-save",
+        action="store_true",
+        help="Latency-only mode: skip comparison plot and reconstruction .npz output.",
+    )
+    parser.add_argument("--power-output", type=Path, default=None)
+    parser.add_argument("--power-vendor", choices=("auto", "nvidia", "amd", "intel"), default="auto")
+    parser.add_argument("--power-devices", default=None)
+    parser.add_argument("--power-interval", type=float, default=0.2)
+    parser.add_argument("--power-label", default="")
+    parser.add_argument(
         "--device",
         choices=("auto", "cpu", "cuda", "xpu"),
         default="auto",
@@ -203,20 +213,29 @@ def main() -> None:
         batch_size=args.batch_size,
         data_dir=str(args.memmap_dir) if args.memmap_dir is not None else None,
         remake_map=args.remake_map,
+        save_outputs=not args.skip_save,
+        power_output=args.power_output,
+        power_vendor=args.power_vendor,
+        power_devices=args.power_devices,
+        power_interval=args.power_interval,
+        power_label=args.power_label,
     )
 
-    result_cpu = result.detach().cpu().numpy()
-    if result_cpu.ndim == 3 and result_cpu.shape[0] == 1:
-        result_cpu = result_cpu[0]
-    np.savez(
-        npz_path,
-        object=result_cpu,
-        dataset=args.dataset,
-        dataset_dir=str(dataset_dir),
-        model_key=model_name,
-        run_id=run_id,
-    )
-    print(f"Saved reconstruction: {npz_path}")
+    if not args.skip_save:
+        result_cpu = result.detach().cpu().numpy()
+        if result_cpu.ndim == 3 and result_cpu.shape[0] == 1:
+            result_cpu = result_cpu[0]
+        np.savez(
+            npz_path,
+            object=result_cpu,
+            dataset=args.dataset,
+            dataset_dir=str(dataset_dir),
+            model_key=model_name,
+            run_id=run_id,
+        )
+        print(f"Saved reconstruction: {npz_path}")
+    else:
+        print("Latency-only mode: skipped plot and reconstruction save.")
     if args.cleanup_memmap:
         cleanup_inference_memmap(args.output_dir, args.memmap_dir)
 

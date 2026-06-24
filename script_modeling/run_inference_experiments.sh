@@ -8,14 +8,14 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # Defaults for modeling experiments. Generate these first with:
 #   ./script_modeling/create_synthetic_inference_sweep.sh
 DATASETS=(
-  modeling_exp/synthetic_inputs/R1000
-  modeling_exp/synthetic_inputs/R2000
-  modeling_exp/synthetic_inputs/R4000
-  modeling_exp/synthetic_inputs/R8000
-  modeling_exp/synthetic_inputs/R12000
-  modeling_exp/synthetic_inputs/R16000
-  modeling_exp/synthetic_inputs/R20000
-  modeling_exp/synthetic_inputs/R26000
+  synthetic_inputs/R1000
+  synthetic_inputs/R2000
+  synthetic_inputs/R4000
+  synthetic_inputs/R8000
+  synthetic_inputs/R12000
+  synthetic_inputs/R16000
+  synthetic_inputs/R20000
+  synthetic_inputs/R26000
 )
 BATCH_SIZES=(1024)
 DEVICE="${DEVICE:-cuda}"
@@ -28,17 +28,17 @@ if [[ -z "${DEVICES+x}" ]]; then
   fi
 fi
 INTERVAL="${INTERVAL:-0.2}"
-WARMUP_SECONDS="${WARMUP_SECONDS:-0.5}"
 CONDA_ENV="${CONDA_ENV:-ptychopinn_torch}"
 PYTHON_BIN="${PYTHON_BIN:-}"
 GPU_LABEL="${GPU_LABEL:-}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-${REPO_ROOT}/modeling_exp}"
-SUMMARY_CSV="${SUMMARY_CSV:-${OUTPUT_ROOT}/inference_summary.csv}"
+SUMMARY_CSV="${SUMMARY_CSV:-}"
 CONTINUE_ON_ERROR="${CONTINUE_ON_ERROR:-false}"
 TEST="${TEST:-false}"
 CONDA_BASE="${CONDA_BASE:-${HOME}/miniforge3}"
 PROFILE_DATASET="${PROFILE_DATASET:-true}"
 MODEL_KEY="${MODEL_KEY:-PS_W}"
+REPEATS="${REPEATS:-2}"
 
 cd "${REPO_ROOT}"
 
@@ -83,12 +83,15 @@ CMD=(
   --device "${DEVICE}"
   --vendor "${VENDOR}"
   --interval "${INTERVAL}"
-  --warmup-seconds "${WARMUP_SECONDS}"
   --conda-env "${CONDA_ENV}"
   --output-root "${OUTPUT_ROOT}"
-  --summary-csv "${SUMMARY_CSV}"
   --model-key "${MODEL_KEY}"
+  --repeats "${REPEATS}"
 )
+
+if [[ -n "${SUMMARY_CSV}" ]]; then
+  CMD+=(--summary-csv "${SUMMARY_CSV}")
+fi
 
 if [[ "${PROFILE_DATASET}" == "true" ]]; then
   CMD+=(--profile-dataset)

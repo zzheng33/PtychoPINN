@@ -55,7 +55,14 @@ def main() -> int:
     ).astype(np.complex64)
 
     object_size = max(args.object_size, r * 3)
-    object_guess = np.ones((object_size, object_size), dtype=np.complex64)
+    yy_obj, xx_obj = np.meshgrid(
+        np.linspace(-1.0, 1.0, object_size, dtype=np.float32),
+        np.linspace(-1.0, 1.0, object_size, dtype=np.float32),
+        indexing="ij",
+    )
+    object_amp = 1.0 + 0.05 * np.sin(4.0 * np.pi * xx_obj) * np.cos(3.0 * np.pi * yy_obj)
+    object_phase = 0.15 * np.sin(2.0 * np.pi * (xx_obj + yy_obj))
+    object_guess = (object_amp * np.exp(1j * object_phase)).astype(np.complex64)
     probe_amp = np.exp(
         -(
             (np.linspace(-1.0, 1.0, r, dtype=np.float32)[:, None] ** 2)

@@ -222,7 +222,7 @@ PtychoPINN/modeling_exp/
 Synthetic datasets:
 
 ```text
-PtychoPINN/modeling_exp/synthetic_inputs/
+PtychoPINN/synthetic_inputs/
 ```
 
 Synthetic datasets are ignored by git. Results are intended to be git-addable.
